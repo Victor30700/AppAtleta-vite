@@ -1,0 +1,224 @@
+/* src/styles/RegistroEntrenamiento.css */
+
+/* General */
+.registro-container {
+  padding: 1rem;
+  background: url('../assets/pista2.jpg') no-repeat center center fixed; /* Imagen de fondo */
+  background-size: cover; /* Hace que la imagen cubra toda la pantalla */
+  min-height: 100vh; /* Asegura que ocupe toda la altura de la pantalla */
+  color: #fff;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', sans-serif;
+  overflow-x: hidden; /* Para evitar desbordes horizontales */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+h2, h3 {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+/* Grupos de formulario */
+.form-group {
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+.form-group.inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+.form-group label {
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+}
+
+/* Inputs y Textareas */
+input[type="text"],
+input[type="number"],
+textarea,
+select {
+  padding: 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  font-size: 1rem;
+  background-color: #fafafa;
+  width: 100%;
+  box-sizing: border-box;
+  color: #222;
+}
+textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* Botones */
+button {
+  padding: 0.75rem 1.25rem;
+  font-size: 1rem;
+  font-weight: bold;
+  background-color: #007aff;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  margin-top: 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s;
+}
+button:hover {
+  background-color: #005fcc;
+  transform: scale(1.02);
+}
+.btn.save {
+  width: 100%;
+  margin-top: 1.5rem;
+  background-color: #00c851;
+}
+.btn.save:hover {
+  background-color: #00b894;
+}
+
+/* Series y Promedio */
+.series-row, .promedio-box {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+.series-row select,
+.series-row input,
+.series-row span,
+.series-row button,
+.promedio-box input,
+.promedio-box button,
+.promedio-box span {
+  flex: 1;
+  min-width: 80px;
+}
+
+/* Estilos para promedio-box */
+.promedio-box {
+  border: 1px solid #00baff;
+  padding: 0.75rem;
+  border-radius: 12px;
+  background-color: rgba(255,255,255,0.1);
+  margin-bottom: 1rem;
+}
+.promedio-box input {
+  margin-bottom: 0.5rem;
+}
+
+/* Animo */
+.animo-group {
+  display: flex;
+  justify-content: space-around;
+  font-size: 1.5rem;
+  margin-top: 0.5rem;
+}
+.animo-group span {
+  cursor: pointer;
+  padding: 0.3rem;
+  border-radius: 8px;
+  transition: transform 0.2s ease;
+}
+.animo-group span.selected,
+.animo-group span:hover {
+  background-color: #007aff;
+  color: #fff;
+  transform: scale(1.2);
+}
+
+/* Historial */
+.historial-row {
+  background-color: rgba(255,255,255,0.1);
+  padding: 0.75rem;
+  border-radius: 12px;
+  margin-bottom: 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.historial-actions button {
+  background-color: #ff9500;
+  color: #fff;
+  margin-left: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+.historial-actions button:last-child {
+  background-color: #ff3b30;
+}
+
+/* Buscador */
+.form-group input[type="text"] {
+  margin-top: 0.5rem;
+}
+
+/* Deslizar entre registros en móviles */
+.registro-list {
+  display: flex;
+  overflow-x: auto; /* Habilitar el deslizamiento horizontal */
+  gap: 1rem;
+  padding: 1rem 0;
+}
+.registro-item {
+  min-width: 200px;
+  background-color: rgba(255,255,255,0.1);
+  padding: 1rem;
+  border-radius: 12px;
+  box-sizing: border-box;
+  flex-shrink: 0; /* Para evitar que se encoja */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Responsive para móviles */
+@media screen and (max-width: 480px) {
+  .series-row, .promedio-box {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  button {
+    width: 100%;
+  }
+  .historial-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .historial-actions {
+    margin-top: 0.5rem;
+    display: flex;
+    gap: 0.5rem;
+  }
+  .registro-list {
+    flex-direction: row;
+    gap: 0.5rem;
+  }
+  .registro-item {
+    min-width: 150px;
+  }
+}
+
+.registro-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.btn-back {
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+}

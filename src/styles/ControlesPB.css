@@ -1,0 +1,268 @@
+/* ControlesPB.css */
+
+/* Contenedor general */
+.controles-container {
+    padding: 1rem;
+    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+    min-height: 100vh;
+    color: #fff;
+    box-sizing: border-box;
+    position: relative;
+  }
+  
+  /* Título */
+  .controles-title {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    animation: fadeInDown 0.8s ease;
+  }
+  
+  /* Animación de fadeInDown */
+  @keyframes fadeInDown {
+    from {
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Botón volver */
+  .back-button {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    color: #fff;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.3s, transform 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  .back-button:hover {
+    background: rgba(255, 255, 255, 0.4);
+    transform: scale(1.05);
+  }
+  
+  /* Formulario de ingreso */
+  .controles-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    justify-content: center;
+    animation: fadeIn 0.8s ease 0.2s both;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  .controles-form input,
+  .controles-form select {
+    flex: 1 1 100px;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    border: none;
+    font-size: 1rem;
+    background: rgba(255,255,255,0.9);
+  }
+  
+  .controles-form button {
+    background: #00b894;
+    color: #fff;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.3s, transform 0.2s;
+  }
+  .controles-form button:hover {
+    background: #019973;
+    transform: scale(1.05);
+  }
+  
+  /* Mensaje cuando no hay registros */
+  .controles-empty {
+    text-align: center;
+    color: #ccc;
+    font-style: italic;
+    margin-top: 2rem;
+  }
+  
+  /* Lista de controles por distancia */
+  .controles-list {
+    animation: fadeIn 0.8s ease 0.4s both;
+  }
+  
+  .controles-distance {
+    margin-bottom: 1rem;
+  }
+  
+  .controles-distance-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .controles-distance-header h3 {
+    font-size: 1.25rem;
+    font-weight: bold;
+  }
+  
+  .controles-distance-header span {
+    font-size: 0.9rem;
+    color: #ffeaa7;
+  }
+  
+  /* Items de lista */
+  .controles-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.15);
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    margin-bottom: 0.25rem;
+    transition: background 0.2s;
+  }
+  .controles-item:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+  
+  .controles-item span {
+    color: #fff;
+  }
+  
+  .controles-item .actions button {
+    background: transparent;
+    border: none;
+    color: #ffeaa7;
+    font-weight: bold;
+    cursor: pointer;
+    margin-left: 0.5rem;
+    transition: color 0.2s;
+  }
+  .controles-item .actions button:hover {
+    color: #fdcb6e;
+  }
+  
+  /* Responsive móvil */
+  @media (max-width: 480px) {
+    .controles-title {
+      font-size: 1.5rem;
+    }
+    .controles-form {
+      flex-direction: column;
+    }
+    .controles-form input,
+    .controles-form select,
+    .controles-form button {
+      width: 100%;
+    }
+  }
+  
+  /* Spinner centrado */
+  .spinner-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+  }
+  
+  /* Selector de unidades */
+  .unit-toggle {
+    display: flex;
+    border: 2px solid #00cec9;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .unit-btn {
+    flex: 1;
+    padding: 0.5rem;
+    background: transparent;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .unit-btn.active {
+    background: #00cec9;
+    color: #2d3436;
+  }
+  
+  /* Botón de guardar */
+  .save-btn {
+    background: #00b894;
+    color: #fff;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s;
+  }
+  .save-btn.pressed {
+    transform: scale(0.95);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  }
+  
+  /* Botón de fecha */
+  .date-btn {
+    flex: 1;
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.9);
+    border: 2px solid #00cec9;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: left;
+  }
+  
+  /* Botones de acción en modal */
+  .modal-action {
+    width: 100%;
+    padding: 0.6rem;
+    margin-top: 1rem;
+    background: #00b894;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+  .modal-action.danger {
+    background: #d63031;
+  }
+  .textarea-sensaciones {
+    width: 100%;
+    max-height: 100px;
+    min-height: 60px;
+    resize: vertical;
+    overflow-y: auto;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+    background-color: #fafafa;
+    margin-top: 10px;
+  }
+  
