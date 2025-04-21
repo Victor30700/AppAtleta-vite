@@ -1,145 +1,224 @@
-/* Fondo estilo Galaxy con imagen fija */
-body {
-    margin: 0;
-    padding: 0;
-    font-family: 'Segoe UI', sans-serif;
-  }
-  
-  .lista-container {
-    min-height: 100vh;
-    padding: 2rem 1rem;
-    background: url('../assets/goku1.jpg') no-repeat center center fixed;
-    background-size: cover;
-    backdrop-filter: blur(6px);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    color: white;
-  }
-  
-  /* Estética de tarjetas Samsung */
-  h2 {
-    text-align: center;
-    margin: 80px 0 1.5rem 0; /* aumenta separación superior */
-    color: #00ffe7;
-    font-weight: 600;
+/* Reset y box-sizing */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Contenedor principal */
+.gym-form-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px;
+  min-height: 100vh;
+  width: 100%;
+  background: url('../assets/gym3.jpg') no-repeat center center fixed;
+  background-size: cover;
+  color: #fff;
+  overflow-y: auto;
+}
+
+/* Botón Volver */
+.btn.back {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.6);
+  font-size: 0.9rem;
+  border: 1px solid #00ffe7;
+  border-radius: 8px;
+  color: #00ffe7;
+  z-index: 1000;
+}
+
+/* Título */
+.gym-form-title {
+  margin-top: 48px;
+  margin-bottom: 16px;
+  font-size: 1.6rem;
+  color: #00ffe7;
+  text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.7);
+  text-align: center;
+}
+
+/* Grupos de formulario */
+.form-group {
+  width: 100%;
+  max-width: 480px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 16px;
+  padding: 12px;
+  margin-bottom: 12px;
+  backdrop-filter: blur(6px);
+}
+
+/* Etiquetas */
+.form-group label {
+  display: block;
+  font-size: 0.9rem;
+  color: #00ffe7;
+  margin-bottom: 6px;
+}
+
+/* Inputs y textarea */
+.form-group input[type="number"],
+.form-group input[type="date"],
+.form-group textarea,
+.form-group select {
+  width: 100%;
+  padding: 10px;
+  font-size: 1rem;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+/* Textarea altura */
+.form-group textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+/* Grupos inline (porcentajes, contador) */
+.inline-group {
+  display: flex;
+  gap: 8px;
+}
+
+.inline-group input {
+  flex: 1;
+}
+
+.btn.small {
+  flex: 0 0 48px;
+  padding: 0;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+/* Listas */
+.percentage-list,
+.results-list {
+  list-style: none;
+  margin-top: 8px;
+}
+
+.percentage-list li,
+.results-list li {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  margin-bottom: 4px;
+}
+
+.small-btn {
+  background: transparent;
+  border: none;
+  color: #ff6b6b;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+/* Botones principales */
+.btn.full {
+  width: 100%;
+  max-width: 480px;
+}
+
+.btn,
+.btn.save,
+.btn.cancel {
+  display: block;
+  background: linear-gradient(135deg, #00ffe7, #007bff);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: center;
+  margin: 8px auto;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.btn:hover,
+.btn.save:hover {
+  transform: scale(1.03);
+}
+
+/* Modal overlay */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1001;
+}
+
+/* Modal content */
+.modal-content {
+  background: rgba(0, 0, 0, 0.8);
+  padding: 16px;
+  width: 100%;
+  max-width: 360px;
+  border-radius: 12px;
+}
+
+.modal-content h3 {
+  color: #00ffe7;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+/* Modal controles */
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* Rango valor display */
+.range-value {
+  margin-left: 8px;
+  font-size: 1.1rem;
+  color: #00ffe7;
+}
+
+/* Scrollbar minimalista */
+.gym-form-container::-webkit-scrollbar {
+  width: 6px;
+}
+.gym-form-container::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.2);
+}
+.gym-form-container::-webkit-scrollbar-thumb {
+  background-color: rgba(0,0,0,0.4);
+  border-radius: 3px;
+}
+
+/* Ajustes para pantallas muy pequeñas */
+@media (max-width: 360px) {
+  .gym-form-title {
     font-size: 1.4rem;
-    text-shadow: 1px 1px 6px #000;
   }
-  
-  
   .form-group {
-    width: 100%;
-    max-width: 420px;
-    background: rgba(0, 0, 0, 0.6);
-    border-radius: 18px;
-    padding: 1rem;
-    margin-bottom: 1rem;
-    box-shadow: 0 0 12px rgba(0, 255, 234, 0.2);
-    backdrop-filter: blur(8px);
+    padding: 10px;
   }
-  
-  .form-group label {
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    margin-bottom: 0.5rem;
-    color: #00ffe7;
-    font-size: 0.95rem;
+  .btn,
+  .btn.full {
+    padding: 10px;
+    font-size: 0.9rem;
   }
-  
-  .form-group label::before {
-    content: '🏋️‍♂️';
-    margin-right: 8px;
+  .inline-group {
+    flex-direction: column;
   }
-  
-  .form-group:nth-child(3) label::before { content: '📊'; }
-  .form-group:nth-child(4) label::before { content: '⚖️'; }
-  .form-group:nth-child(5) label::before { content: '🔁'; }
-  .form-group:nth-child(6) label::before { content: '📅'; }
-  .form-group:nth-child(7) label::before { content: '📆'; }
-  .form-group:nth-child(8) label::before { content: '📝'; }
-  
-  input[type='number'],
-  input[type='date'],
-  input[type='text'],
-  textarea {
-    width: 100%;
-    padding: 0.7rem;
-    border-radius: 10px;
-    border: none;
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
-    font-size: 1rem;
-    outline: none;
-    box-shadow: inset 0 0 6px rgba(0, 255, 234, 0.1);
-  }
-  
-  /* Botones deportivos */
-  .btn {
-    background: linear-gradient(135deg, #00ffe7, #007bff);
-    border: none;
-    border-radius: 12px;
-    padding: 0.7rem 1.2rem;
-    font-weight: bold;
-    color: white;
-    margin-top: 1rem;
-    cursor: pointer;
-    box-shadow: 0 0 12px rgba(0, 255, 234, 0.4);
-    transition: transform 0.2s ease, background 0.3s ease;
-    width: 100%;
-    max-width: 300px;
-    text-align: center;
-  }
-  
-  .btn:hover {
-    transform: scale(1.03);
-    background: linear-gradient(135deg, #00ccff, #004aad);
-  }
-  
-  .btn.back {
-    background: rgba(0, 0, 0, 0.5);
-    padding: 0.5rem 0.8rem;
-    font-size: 0.85rem;
-    box-shadow: none;
-    border: 1px solid #00ffe7;
-    position: fixed;
-    top: 16px;
-    left: 16px;
-    z-index: 999;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  
-  
-  /* Contador reps */
-  .form-group .btn {
-    max-width: 50px;
-    padding: 0.5rem;
-    font-size: 1.1rem;
-  }
-  
-  .form-group span {
-    min-width: 40px;
-    text-align: center;
-    color: #00ffe7;
-    font-size: 1.5rem;
-    font-weight: bold;
-  }
-  
-  /* Responsive tweaks */
-  @media (min-width: 480px) {
-    .lista-container {
-      padding: 2.5rem;
-    }
-  
-    .form-group {
-      padding: 1.5rem;
-    }
-  
-    .btn {
-      font-size: 1rem;
-    }
-  }
-  
+}

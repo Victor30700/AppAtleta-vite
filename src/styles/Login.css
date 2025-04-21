@@ -98,3 +98,19 @@
 .login-button:hover {
   background-color: darkred;
 }
+
+.crear-cuenta-link {
+  margin-top: 1rem;
+  text-align: center;
+  color: #ddd;
+}
+
+.crear-cuenta-link a {
+  color: #00bcd4;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.crear-cuenta-link a:hover {
+  text-decoration: underline;
+}

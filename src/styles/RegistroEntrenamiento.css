@@ -1,224 +1,254 @@
 /* src/styles/RegistroEntrenamiento.css */
 
-/* General */
+/* GENERAL GALAXY VIBES */
 .registro-container {
   padding: 1rem;
-  background: url('../assets/pista2.jpg') no-repeat center center fixed; /* Imagen de fondo */
-  background-size: cover; /* Hace que la imagen cubra toda la pantalla */
-  min-height: 100vh; /* Asegura que ocupe toda la altura de la pantalla */
-  color: #fff;
-  box-sizing: border-box;
-  font-family: 'Segoe UI', sans-serif;
-  overflow-x: hidden; /* Para evitar desbordes horizontales */
+  background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(20, 20, 20, 0.7)),
+              url('../assets/pista2.jpg') no-repeat center center fixed;
+  background-size: cover;
+  min-height: 100vh;
+  color: #f2f2f2;
+  font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
   align-items: center;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
+/* TITULARES */
 h2, h3 {
   text-align: center;
-  margin-bottom: 1rem;
+  margin: 1rem 0;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
 }
 
-/* Grupos de formulario */
-.form-group {
-  margin-bottom: 1rem;
-  display: flex;
-  flex-direction: column;
-}
-.form-group.inline {
-  flex-direction: row;
-  align-items: center;
-  gap: 0.5rem;
-}
-.form-group label {
-  font-weight: bold;
-  margin-bottom: 0.5rem;
-}
-
-/* Inputs y Textareas */
-input[type="text"],
-input[type="number"],
-textarea,
-select {
-  padding: 0.75rem;
-  border: 1px solid #ccc;
-  border-radius: 12px;
-  font-size: 1rem;
-  background-color: #fafafa;
+/* HEADER */
+.registro-header {
   width: 100%;
-  box-sizing: border-box;
-  color: #222;
-}
-textarea {
-  resize: vertical;
-  min-height: 80px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
 }
 
-/* Botones */
+/* BOTONES ESTILO GALAXY */
 button {
-  padding: 0.75rem 1.25rem;
+  padding: 0.75rem 1.5rem;
   font-size: 1rem;
   font-weight: bold;
-  background-color: #007aff;
+  background: rgba(0, 122, 255, 0.8);
   color: #fff;
   border: none;
-  border-radius: 12px;
-  margin-top: 0.5rem;
+  border-radius: 16px;
   cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s;
+  box-shadow: 0 4px 15px rgba(0, 122, 255, 0.3);
+  transition: all 0.3s ease;
 }
 button:hover {
-  background-color: #005fcc;
-  transform: scale(1.02);
+  background: rgba(0, 122, 255, 1);
+  transform: scale(1.03);
 }
-.btn.save {
-  width: 100%;
-  margin-top: 1.5rem;
-  background-color: #00c851;
+.btn-back {
+  background: rgba(255, 69, 58, 0.85);
 }
-.btn.save:hover {
-  background-color: #00b894;
+.btn-back:hover {
+  background: rgba(255, 69, 58, 1);
 }
 
-/* Series y Promedio */
-.series-row, .promedio-box {
+/* FORMULARIOS Y BUSCADORES */
+.form-group {
+  width: 100%;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 1rem;
+}
+.form-group label {
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+input[type="text"],
+input[type="month"],
+textarea,
+select {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border: 1px solid #ffffff33;
+  border-radius: 12px;
+  padding: 0.75rem;
+  font-size: 1rem;
+  backdrop-filter: blur(6px);
+  outline: none;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+}
+input::placeholder {
+  color: #ccc;
+}
+select option {
+  color: #000;
+  background-color: #fff;
+}
+
+/* BLOQUES DE HISTORIAL */
+.historial-row {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  backdrop-filter: blur(5px);
+  width: 100%;
+  max-width: 700px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow: hidden;           /* evita que el contenido se salga */
+}
+
+/* TEXTO ORGANIZADO E ICONOS */
+.registro-clave {
+  flex: 1;
+}
+.registro-clave p {
+  font-size: 1.1rem;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+  color: #fff;
+  border-bottom: 1px solid rgba(255,255,255,0.2);
+  padding-bottom: 0.3rem;
+}
+.registro-clave ul {
+  padding-left: 1rem;
+  margin: 0.5rem 0;
+  list-style: none;
+}
+.registro-clave li {
+  margin: 0.4rem 0;
+  font-size: 0.95rem;
+  color: #e0e0e0;
+  line-height: 1.4;
+  word-wrap: break-word;      /* ajusta texto largo */
+}
+.registro-clave li strong {
+  color: #00d4ff;
+  font-weight: 600;
+}
+.registro-clave ul ul {
+  padding-left: 1.5rem;
+  margin-top: 0.3rem;
+}
+.registro-clave li::before {
+  content: '📌 ';
+  margin-right: 4px;
+  color: rgba(255,255,255,0.6);
+}
+/* selectores basados en contenido (sólo en navegadores soportados) */
+.registro-clave li:has(strong:contains('Series'))::before {
+  content: '📊 ';
+}
+.registro-clave li:has(strong:contains('Promedios'))::before {
+  content: '⏱️ ';
+}
+.registro-clave li:has(strong:contains('Estado físico'))::before {
+  content: '💪 ';
+}
+.registro-clave li:has(strong:contains('Ánimo'))::before {
+  content: '🧠 ';
+}
+.registro-clave li:has(strong:contains('Sensaciones'))::before {
+  content: '💬 ';
+}
+.registro-clave li:has(strong:contains('Plan'))::before {
+  content: '🗂️ ';
+}
+
+/* ACCIONES */
+.historial-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+.historial-actions button {
+  font-size: 0.9rem;
+  padding: 0.5rem 1rem;
+  flex: 1;
+}
+.historial-actions button:first-child {
+  background: #1abc9c;
+}
+.historial-actions button:last-child {
+  background: #e74c3c;
+}
+
+/* BLOQUES DE SERIES Y PROMEDIOS */
+.series-row,
+.promedio-box {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0.75rem;
+  border-radius: 12px;
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  align-items: center;
-  margin-bottom: 0.75rem;
+  margin-bottom: 1rem;
+  backdrop-filter: blur(4px);
+  overflow-x: auto;
 }
 .series-row select,
 .series-row input,
-.series-row span,
-.series-row button,
-.promedio-box input,
-.promedio-box button,
-.promedio-box span {
-  flex: 1;
-  min-width: 80px;
-}
-
-/* Estilos para promedio-box */
-.promedio-box {
-  border: 1px solid #00baff;
-  padding: 0.75rem;
-  border-radius: 12px;
-  background-color: rgba(255,255,255,0.1);
-  margin-bottom: 1rem;
-}
 .promedio-box input {
-  margin-bottom: 0.5rem;
+  flex: 1 1 80px;
+  min-width: 80px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border: none;
+  padding: 0.5rem;
+  border-radius: 10px;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
 }
 
-/* Animo */
+/* ÁNIMO ICONS */
 .animo-group {
   display: flex;
   justify-content: space-around;
+  margin: 0.5rem 0;
   font-size: 1.5rem;
-  margin-top: 0.5rem;
 }
 .animo-group span {
   cursor: pointer;
-  padding: 0.3rem;
+  padding: 0.3rem 0.5rem;
   border-radius: 8px;
-  transition: transform 0.2s ease;
+  transition: all 0.2s ease-in-out;
 }
 .animo-group span.selected,
 .animo-group span:hover {
-  background-color: #007aff;
+  background: #007aff;
   color: #fff;
   transform: scale(1.2);
 }
 
-/* Historial */
-.historial-row {
-  background-color: rgba(255,255,255,0.1);
-  padding: 0.75rem;
-  border-radius: 12px;
-  margin-bottom: 0.75rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.historial-actions button {
-  background-color: #ff9500;
-  color: #fff;
-  margin-left: 0.5rem;
-  padding: 0.4rem 0.8rem;
-  border-radius: 10px;
-  font-size: 0.9rem;
-  border: none;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-}
-.historial-actions button:last-child {
-  background-color: #ff3b30;
-}
-
-/* Buscador */
-.form-group input[type="text"] {
-  margin-top: 0.5rem;
-}
-
-/* Deslizar entre registros en móviles */
-.registro-list {
-  display: flex;
-  overflow-x: auto; /* Habilitar el deslizamiento horizontal */
-  gap: 1rem;
-  padding: 1rem 0;
-}
-.registro-item {
-  min-width: 200px;
-  background-color: rgba(255,255,255,0.1);
-  padding: 1rem;
-  border-radius: 12px;
-  box-sizing: border-box;
-  flex-shrink: 0; /* Para evitar que se encoja */
-  display: flex;
-  flex-direction: column;
-}
-
-/* Responsive para móviles */
+/* RESPONSIVE OPTIMIZATION */
 @media screen and (max-width: 480px) {
-  .series-row, .promedio-box {
+  .registro-header {
     flex-direction: column;
     align-items: stretch;
+    gap: 0.5rem;
+  }
+  .historial-actions {
+    flex-direction: column;
+    gap: 0.5rem;
   }
   button {
     width: 100%;
   }
-  .historial-row {
-    flex-direction: column;
-    align-items: flex-start;
+  .form-group {
+    width: 100%;
   }
-  .historial-actions {
-    margin-top: 0.5rem;
-    display: flex;
-    gap: 0.5rem;
+  .registro-clave ul {
+    font-size: 0.95rem;
   }
-  .registro-list {
-    flex-direction: row;
-    gap: 0.5rem;
-  }
-  .registro-item {
-    min-width: 150px;
-  }
-}
-
-.registro-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.btn-back {
-  background-color: #e74c3c;
-  color: white;
-  border: none;
-  padding: 8px 12px;
-  border-radius: 5px;
-  cursor: pointer;
 }

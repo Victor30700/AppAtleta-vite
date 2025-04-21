@@ -1,8 +1,15 @@
+// src/pages/RegistroGymForm.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { db } from '../config/firebase';
 import { getAuth } from 'firebase/auth';
-import { collection, addDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
+import {
+  collection,
+  addDoc,
+  doc,
+  getDoc,
+  updateDoc
+} from 'firebase/firestore';
 import '../styles/RegistroGymForm.css';
 
 export default function RegistroGymForm() {
@@ -12,71 +19,95 @@ export default function RegistroGymForm() {
   const auth = getAuth();
   const user = auth.currentUser;
 
-  const [peso, setPeso] = useState(0);
-  const [porcentaje, setPorcentaje] = useState(0);
-  const [resultado, setResultado] = useState(0);
-  const [contador, setContador] = useState(0);
-  const [fechaInicio, setFechaInicio] = useState('');
-  const [fechaFin, setFechaFin] = useState('');
-  const [descripcion, setDescripcion] = useState('');
+  const [pesocorporal, setPesocorporal] = useState(0);
+  const [percentInput, setPercentInput] = useState('');
+  const [porcentajesCarga, setPorcentajesCarga] = useState([]);
+  const [calculos, setCalculos] = useState([]);
+  const [historialReps, setHistorialReps] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  const [modalEstado, setModalEstado] = useState(5);
+  const [modalAnimo, setModalAnimo] = useState('neutral');
+  const [plan, setPlan] = useState({ fechaInicio: '', fechaFin: '', descripcion: '' });
 
   useEffect(() => {
-    const cargarRegistro = async () => {
-      if (registroId) {
-        try {
-          const docRef = doc(db, 'registrosGym', registroId);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            if (data.email !== user.email) {
-              alert("No tienes permiso para editar este registro.");
-              return navigate('/registro-gym');
-            }
-            setPeso(data.peso || 0);
-            setPorcentaje(data.porcentaje || 0);
-            setResultado(data.resultado || 0);
-            setContador(data.repeticiones || 0);
-            setFechaInicio(data.fechaInicio || '');
-            setFechaFin(data.fechaFin || '');
-            setDescripcion(data.descripcion || '');
-          }
-        } catch (error) {
-          console.error('Error al cargar el registro:', error);
-        }
+    async function cargarRegistro() {
+      if (!registroId || !user) return;
+      const docRef = doc(db, 'registrosGym', registroId);
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) return;
+      const data = docSnap.data();
+      const recordEmail = data.metadata?.email || data.email;
+      if (recordEmail !== user.email) {
+        alert('No tienes permiso para editar este registro.');
+        return navigate('/registro-gym');
       }
-    };
-
-    if (user) {
-      cargarRegistro();
+      setPesocorporal(data.peso || 0);
+      setPorcentajesCarga(data.porcentajesCarga ?? data.porcentajes ?? []);
+      setCalculos(data.calculos ?? data.calculados ?? []);
+      setHistorialReps(data.historialReps ?? data.repHistory ?? []);
+      setPlan(
+        data.plan
+          ? data.plan
+          : {
+              fechaInicio: data.fechaInicio || '',
+              fechaFin: data.fechaFin || '',
+              descripcion: data.descripcion || ''
+            }
+      );
     }
+    cargarRegistro();
   }, [registroId, user, navigate]);
 
-  const calcularPeso = () => {
-    const resultado = (peso * porcentaje) / 100;
-    setResultado(resultado);
+  const addPercentage = () => {
+    const val = parseFloat(percentInput);
+    if (isNaN(val) || val <= 0) return;
+    setPorcentajesCarga((p) => [...p, val]);
+    setPercentInput('');
   };
+  const removePercentage = (idx) => {
+    setPorcentajesCarga((p) => p.filter((_, i) => i !== idx));
+  };
+  const calcularPesos = () => {
+    const results = porcentajesCarga.map((p) => ({
+      porcentaje: p,
+      pesoCalculado: +(pesocorporal * p / 100).toFixed(2)
+    }));
+    setCalculos(results);
+  };
+
+  const handleIncrement = () => setShowModal(true);
+  const handleDecrement = () => {
+    if (!historialReps.length) return;
+    if (window.confirm('¿Seguro que quieres eliminar la última repetición?')) {
+      setHistorialReps((h) => h.slice(0, -1));
+    }
+  };
+  const saveModal = () => {
+    const now = new Date().toISOString();
+    setHistorialReps((h) => [...h, { fecha: now, estadoFisico: modalEstado, animo: modalAnimo }]);
+    setShowModal(false);
+  };
+  const cancelModal = () => setShowModal(false);
 
   const handleGuardar = async () => {
     const registro = {
-      peso,
-      porcentaje,
-      resultado,
-      repeticiones: contador,
-      fechaInicio,
-      fechaFin,
-      descripcion,
-      actualizadoEn: new Date().toISOString(),
-      email: user.email,
+      peso: pesocorporal,
+      porcentajesCarga,
+      calculos,
+      historialReps,
+      repeticiones: historialReps.length,
+      plan,
+      metadata: {
+        email: user.email,
+        actualizadoEn: new Date().toISOString(),
+        ...(registroId ? {} : { creadoEn: new Date().toISOString() })
+      }
     };
-
     try {
       if (registroId) {
         await updateDoc(doc(db, 'registrosGym', registroId), registro);
       } else {
-        await addDoc(collection(db, 'registrosGym'), {
-          ...registro,
-          creadoEn: new Date().toISOString(),
-        });
+        await addDoc(collection(db, 'registrosGym'), registro);
       }
       navigate('/registro-gym');
     } catch (error) {
@@ -85,67 +116,89 @@ export default function RegistroGymForm() {
   };
 
   return (
-    <div className="lista-container">
-      <button
-        className="btn back"
-        onClick={() => navigate(-1)}
-        style={{ position: 'fixed', top: 10, left: 10, zIndex: 999 }}
-      >
-        Volver
-      </button>
-
-      <h2>{registroId ? 'Editar Registro' : 'Nuevo Registro'} de Entrenamiento</h2>
-
-      {/* campos como antes... */}
+    <div className="gym-form-container">
+      <button className="btn back" onClick={() => navigate(-1)}>← Volver</button>
+      <h2>{registroId ? 'Editar Registro GYM' : 'Nuevo Registro GYM'}</h2>
 
       <div className="form-group">
         <label>Peso corporal (kg)</label>
-        <input type="number" value={peso} onChange={e => setPeso(Number(e.target.value))} />
+        <input type="number" value={pesocorporal} onChange={(e) => setPesocorporal(Number(e.target.value))} />
       </div>
 
       <div className="form-group">
-        <label>Porcentaje (%)</label>
-        <input type="number" value={porcentaje} onChange={e => setPorcentaje(Number(e.target.value))} />
+        <label>% de carga</label>
+        <div className="inline-group">
+          <input type="number" placeholder="%" value={percentInput} onChange={(e) => setPercentInput(e.target.value)} />
+          <button className="btn small" onClick={addPercentage}>+</button>
+        </div>
+        <ul className="percentage-list">
+          {porcentajesCarga.map((p, i) => (
+            <li key={i}>
+              {p}% <button className="small-btn" onClick={() => removePercentage(i)}>✕</button>
+            </li>
+          ))}
+        </ul>
       </div>
 
-      <button className="btn" onClick={calcularPeso}>Calcular Peso</button>
+      <button className="btn full" onClick={calcularPesos}>Calcular pesos</button>
 
       <div className="form-group">
-        <label>Peso calculado (kg)</label>
-        <input type="text" value={resultado.toFixed(2)} readOnly />
+        <label>Pesos calculados</label>
+        <ul className="results-list">
+          {calculos.map((r, i) => (
+            <li key={i}>{r.porcentaje}% → {r.pesoCalculado} kg</li>
+          ))}
+        </ul>
       </div>
 
       <div className="form-group">
-        <label>Marca las veces que cumpliste el plan</label>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn" onClick={() => setContador(c => Math.max(0, c - 1))}>-</button>
-          <span style={{ fontSize: '1.5rem', lineHeight: '40px' }}>{contador}</span>
-          <button className="btn" onClick={() => setContador(c => c + 1)}>+</button>
+        <label>Veces cumpliste el plan: {historialReps.length}</label>
+        <div className="inline-group">
+          <button className="btn small" onClick={handleDecrement}>–</button>
+          <button className="btn small" onClick={handleIncrement}>+</button>
         </div>
       </div>
 
       <div className="form-group">
-        <label>Fecha de inicio</label>
-        <input type="date" value={fechaInicio} onChange={e => setFechaInicio(e.target.value)} />
+        <label>Fecha inicio</label>
+        <input type="date" value={plan.fechaInicio} onChange={(e) => setPlan({ ...plan, fechaInicio: e.target.value })} />
       </div>
-
       <div className="form-group">
-        <label>Fecha de fin</label>
-        <input type="date" value={fechaFin} onChange={e => setFechaFin(e.target.value)} />
+        <label>Fecha fin</label>
+        <input type="date" value={plan.fechaFin} onChange={(e) => setPlan({ ...plan, fechaFin: e.target.value })} />
       </div>
-
       <div className="form-group">
         <label>Descripción del plan</label>
-        <textarea
-          value={descripcion}
-          onChange={e => setDescripcion(e.target.value)}
-          style={{ height: 100, overflowY: 'scroll', width: '100%' }}
-        />
+        <textarea value={plan.descripcion} onChange={(e) => setPlan({ ...plan, descripcion: e.target.value })} />
       </div>
 
-      <button className="btn" onClick={handleGuardar}>
-        {registroId ? 'Actualizar' : 'Guardar'}
-      </button>
+      <button className="btn save full" onClick={handleGuardar}>{registroId ? 'Actualizar' : 'Guardar'}</button>
+
+      {showModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>Registrar entrenamiento</h3>
+            <div className="form-group">
+              <label>Estado físico</label>
+              <input type="range" min="1" max="10" value={modalEstado} onChange={(e) => setModalEstado(Number(e.target.value))} /> <span>{modalEstado}</span>
+            </div>
+            <div className="form-group">
+              <label>Ánimo</label>
+              <select value={modalAnimo} onChange={(e) => setModalAnimo(e.target.value)}>
+                <option value="enojado">😠 Enojado</option>
+                <option value="triste">😢 Triste</option>
+                <option value="neutral">😐 Neutral</option>
+                <option value="feliz">😊 Feliz</option>
+                <option value="super motivado">🚀 Súper motivado</option>
+              </select>
+            </div>
+            <div className="modal-actions">
+              <button className="btn cancel" onClick={cancelModal}>Cancelar</button>
+              <button className="btn save" onClick={saveModal}>Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

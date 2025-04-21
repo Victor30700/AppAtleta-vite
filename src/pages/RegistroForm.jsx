@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+// src/pages/RegistroForm.jsx
+import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../config/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -28,16 +29,30 @@ export default function RegistroForm() {
   const [sensaciones, setSensaciones] = useState('');
   const [seriesInputs, setSeriesInputs] = useState([]);
   const [promedios, setPromedios] = useState([]);
+  const [sleepHours, setSleepHours] = useState(editRecord?.sleepHours?.toString() || '');
+  const [saving, setSaving] = useState(false);
+
+  const sleepRecommendation = useMemo(() => {
+    const h = Number(sleepHours);
+    if (isNaN(h) || h < 1) return '';
+    if (h <= 3) return 'Crítico: muy pocas horas de sueño.';
+    if (h <= 5) return 'Insuficiente: no es ideal para entrenar.';
+    if (h <= 7) return 'Aceptable: descanso moderado.';
+    if (h === 8) return 'Óptimo: sueño perfecto para recuperación.';
+    if (h <= 10) return 'Exceso: posible somnolencia.';
+    return '';
+  }, [sleepHours]);
 
   const docControles = user?.email && doc(db, 'controlesPB', user.email);
   const docRegistro = user?.email && doc(db, 'registroEntreno', user.email);
 
   useEffect(() => {
-    const loadControles = async () => {
-      const snap = await getDoc(docControles);
-      setControles(snap.exists() ? snap.data() : {});
-    };
-    if (user) loadControles();
+    if (user) {
+      (async () => {
+        const snap = await getDoc(docControles);
+        setControles(snap.exists() ? snap.data() : {});
+      })();
+    }
   }, [user]);
 
   useEffect(() => {
@@ -49,6 +64,7 @@ export default function RegistroForm() {
       setSensaciones(editRecord.sensaciones || '');
       setSeriesInputs(editRecord.series || []);
       setPromedios(editRecord.promedios || []);
+      setSleepHours(editRecord.sleepHours?.toString() || '');
     }
   }, [editRecord]);
 
@@ -56,9 +72,9 @@ export default function RegistroForm() {
     setSeriesInputs(prev => {
       const copy = [...prev];
       copy[idx] = { ...copy[idx], [field]: val };
-      if (field === 'distancia') {
-        const base = getLatestTime(val, controles);
-        copy[idx].base = base;
+      if (field === 'pruebaKey') {
+        const baseValor = getLatestTime(val, controles);
+        copy[idx].base = baseValor ?? null;
         copy[idx].sugerido = null;
       }
       return copy;
@@ -69,26 +85,30 @@ export default function RegistroForm() {
     setSeriesInputs(prev => {
       const copy = [...prev];
       const e = copy[idx];
-      if (!e.base || !e.porcentaje) return copy;
-      copy[idx].sugerido = ((e.base * 100) / parseFloat(e.porcentaje)).toFixed(2);
+      if (e.base == null || !e.porcentaje) return copy;
+      const porcentaje = parseFloat(e.porcentaje);
+      copy[idx].sugerido = porcentaje
+        ? ((e.base * 100) / porcentaje).toFixed(2)
+        : null;
       return copy;
     });
   };
 
-  const agregarSerie = () => {
-    setSeriesInputs(prev => [...prev, { distancia: '', base: null, porcentaje: '', sugerido: null }]);
-  };
-
-  const agregarPromedio = () => {
-    setPromedios(prev => [...prev, { distancia: '', series: [], promedio: null }]);
-  };
+  const agregarSerie = () =>
+    setSeriesInputs(prev => [...prev, { pruebaKey: '', base: null, porcentaje: '', sugerido: null }]);
+  const eliminarUltimaSerie = () =>
+    setSeriesInputs(prev => prev.slice(0, -1));
+  const agregarPromedio = () =>
+    setPromedios(prev => [...prev, { pruebaKey: '', series: [], promedio: null }]);
+  const eliminarUltimoPromedio = () =>
+    setPromedios(prev => prev.slice(0, -1));
 
   const calcularPromedios = () => {
     setPromedios(prev =>
       prev.map(p => {
-        const tiempos = p.series.map(s => parseFloat(s)).filter(n => !isNaN(n));
-        const prom = tiempos.length > 0
-          ? (tiempos.reduce((a, b) => a + b, 0) / tiempos.length).toFixed(2)
+        const vals = p.series.map(s => parseFloat(s)).filter(n => !isNaN(n));
+        const prom = vals.length
+          ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2)
           : null;
         return { ...p, promedio: prom };
       })
@@ -96,127 +116,168 @@ export default function RegistroForm() {
   };
 
   const handleGuardar = async () => {
-    const nuevo = {
-      fecha: editRecord?.fecha || new Date().toISOString().split('T')[0],
-      plan,
-      gymDone,
-      series: seriesInputs.map(e => ({
-        distancia: e.distancia,
-        base: e.base,
-        porcentaje: parseFloat(e.porcentaje),
-        sugerido: e.sugerido,
-      })),
-      promedios,
-      estadoFisico,
-      animo,
-      sensaciones: sensaciones.trim() || null,
-    };
+    if (saving) return;
+    setSaving(true);
+    try {
+      const nuevo = {
+        fecha: editRecord?.fecha || new Date().toISOString().split('T')[0],
+        plan: plan.trim(),
+        gymDone,
+        estadoFisico,
+        animo,
+        sensaciones: sensaciones.trim() || null,
+        sleepHours: sleepHours ? Number(sleepHours) : null,
+        sleepRecommendation,
+        series: seriesInputs,
+        promedios,
+      };
 
-    const snap = await getDoc(docRegistro);
-    const existing = snap.exists() ? snap.data().registros || [] : [];
-
-    let updated;
-    if (editRecord) {
-      updated = existing.map((r, i) => (i === editRecord.index ? nuevo : r));
-    } else {
-      updated = [nuevo, ...existing];
+      const snap = await getDoc(docRegistro);
+      const existing = snap.exists() ? snap.data().registros || [] : [];
+      const updated = editRecord
+        ? existing.map((r, i) => (i === editRecord.index ? nuevo : r))
+        : [nuevo, ...existing];
+      await setDoc(docRegistro, { registros: updated });
+      navigate('/registro');
+    } finally {
+      setSaving(false);
     }
-
-    await setDoc(docRegistro, { registros: updated });
-    navigate('/registro');
   };
 
   return (
     <div className="registro-container">
       <div className="header">
-        <button className="btn red back-btn" onClick={() => navigate('/registro')}>
+        <button
+          className="btn red back-btn"
+          onClick={() => navigate('/registro')}
+          disabled={saving}
+        >
           Volver
         </button>
-        <h2>{editRecord ? 'Editar Registro de Entrenamiento' : 'Nuevo Registro de Entrenamiento'}</h2>
+        <h2>{editRecord ? 'Editar Registro' : 'Nuevo Registro'}</h2>
       </div>
 
+      {/* Plan */}
       <div className="form-group">
         <label>Plan de entrenamiento</label>
-        <textarea value={plan} onChange={e => setPlan(e.target.value)} />
+        <textarea
+          value={plan}
+          onChange={e => setPlan(e.target.value)}
+          disabled={saving}
+        />
       </div>
 
+      {/* Gym cumplido */}
       <div className="form-group inline">
         <label>Plan Gym Cumplido</label>
         <input
           type="checkbox"
           checked={gymDone}
           onChange={e => setGymDone(e.target.checked)}
+          disabled={saving}
         />
       </div>
 
-      <h3>Distancia a correr</h3>
+      {/* Sensaciones */}
+      <div className="form-group">
+        <label>Sensaciones (opcional)</label>
+        <textarea
+          className="textarea-sensaciones"
+          placeholder="Describe cómo te sentiste..."
+          value={sensaciones}
+          onChange={e => setSensaciones(e.target.value)}
+          disabled={saving}
+        />
+      </div>
+
+      {/* Pruebas / Series */}
+      <h3>Pruebas / Series</h3>
       {seriesInputs.map((e, i) => (
         <div key={i} className="series-row">
           <select
-            value={e.distancia}
-            onChange={v => handleSeriesChange(i, 'distancia', v.target.value)}
+            value={e.pruebaKey}
+            onChange={v => handleSeriesChange(i, 'pruebaKey', v.target.value)}
+            disabled={saving}
           >
-            <option value="">Selecciona distancia</option>
+            <option value="">Selecciona prueba</option>
             {Object.keys(controles).map(key => (
               <option key={key} value={key}>{key}</option>
             ))}
           </select>
-          <span>{e.base ? `${e.base}s` : '-'}</span>
+          <span>{e.base ?? '-'}</span>
           <input
             type="number"
-            placeholder="Porcentaje%"
+            placeholder="Porcentaje %"
             value={e.porcentaje}
             onChange={v => handleSeriesChange(i, 'porcentaje', v.target.value)}
+            disabled={saving}
           />
-          <button onClick={() => calcularSugerido(i)}>Calcular</button>
-          <span>{e.sugerido ? `${e.sugerido}s` : '-'}</span>
+          <button onClick={() => calcularSugerido(i)} disabled={saving}>Calcular</button>
+          <span>{e.sugerido ?? '-'}</span>
         </div>
       ))}
-      <button className="btn" onClick={agregarSerie}> Agregar distancia</button>
+      <div className="button-group-inline">
+        <button className="btn" onClick={agregarSerie} disabled={saving}>Agregar prueba</button>
+        <button className="btn danger" onClick={eliminarUltimaSerie} disabled={!seriesInputs.length || saving}>
+          Eliminar prueba
+        </button>
+      </div>
 
-      <h3>Registra tus series</h3>
+      {/* Repeticiones */}
+      <h3>Registra tus repeticiones</h3>
       {promedios.map((p, i) => (
         <div key={i} className="promedio-box">
           <input
             type="text"
-            placeholder="Distancia"
-            value={p.distancia}
+            placeholder="Prueba"
+            value={p.pruebaKey}
             onChange={e => {
               const copy = [...promedios];
-              copy[i].distancia = e.target.value;
+              copy[i].pruebaKey = e.target.value;
               setPromedios(copy);
             }}
+            disabled={saving}
           />
           {p.series.map((s, j) => (
             <input
               key={j}
               type="number"
-              placeholder={`reps ${j + 1}`}
+              placeholder={`Serie ${j + 1}`}
               value={s}
               onChange={e => {
                 const copy = [...promedios];
                 copy[i].series[j] = e.target.value;
                 setPromedios(copy);
               }}
+              disabled={saving}
             />
           ))}
-          <button
-            onClick={() => {
-              const copy = [...promedios];
-              copy[i].series.push('');
-              setPromedios(copy);
-            }}
-          >
-            + reps
-          </button>
-          <span>Promedio: {p.promedio ? `${p.promedio}s` : '-'}</span>
+          <button onClick={() => {
+            const copy = [...promedios];
+            copy[i].series.push('');
+            setPromedios(copy);
+          }} disabled={saving}>+ Serie</button>
+          <button onClick={() => {
+            const copy = [...promedios];
+            copy[i].series = copy[i].series.slice(0, -1);
+            setPromedios(copy);
+          }} disabled={!p.series.length || saving}>- Serie</button>
+          <span>Promedio: {p.promedio ?? '-'}</span>
         </div>
       ))}
-      <button className="btn" onClick={agregarPromedio}> Agregar + series</button>
+      <div className="button-group-inline">
+        <button className="btn" onClick={agregarPromedio} disabled={saving}>Agregar bloque de repes</button>
+        <button className="btn danger" onClick={eliminarUltimoPromedio} disabled={!promedios.length || saving}>
+          Eliminar bloque
+        </button>
+      </div>
       {promedios.length > 0 && (
-        <button className="btn" onClick={calcularPromedios}>Calcular Promedios</button>
+        <button className="btn" onClick={calcularPromedios} disabled={saving}>
+          Calcular Promedios
+        </button>
       )}
 
+      {/* Estado físico */}
       <div className="form-group">
         <label>Estado físico: {estadoFisico}</label>
         <input
@@ -225,9 +286,11 @@ export default function RegistroForm() {
           max="10"
           value={estadoFisico}
           onChange={e => setEstadoFisico(+e.target.value)}
+          disabled={saving}
         />
       </div>
 
+      {/* Ánimo */}
       <div className="form-group">
         <label>Ánimo</label>
         <div className="animo-group">
@@ -235,7 +298,7 @@ export default function RegistroForm() {
             <span
               key={m.value}
               className={animo === m.value ? 'selected' : ''}
-              onClick={() => setAnimo(m.value)}
+              onClick={() => !saving && setAnimo(m.value)}
             >
               {m.icon}
             </span>
@@ -243,14 +306,28 @@ export default function RegistroForm() {
         </div>
       </div>
 
+      {/* Horas de sueño */}
       <div className="form-group">
-        <label>Comentarios (opcional)</label>
-        <textarea value={sensaciones} onChange={e => setSensaciones(e.target.value)} />
+        <label>Horas de sueño (1–10)</label>
+        <input
+          type="number"
+          min="1"
+          max="10"
+          value={sleepHours}
+          onChange={e => setSleepHours(e.target.value)}
+          disabled={saving}
+        />
+        {sleepRecommendation && <p className="sleep-msg">{sleepRecommendation}</p>}
       </div>
 
+      {/* Guardar */}
       <div className="button-group">
-        <button className="btn save" onClick={handleGuardar}>
-          Guardar Registro
+        <button
+          className="btn save"
+          onClick={handleGuardar}
+          disabled={saving}
+        >
+          {editRecord ? 'Actualizar Registro' : 'Guardar Registro'}
         </button>
       </div>
     </div>

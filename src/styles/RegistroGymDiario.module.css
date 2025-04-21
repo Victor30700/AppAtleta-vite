@@ -1,0 +1,204 @@
+/* src/styles/RegistroGymDiario.module.css */
+
+/* Contenedor principal: fondo aplicado solo a este componente */
+.container {
+    width: 100%;
+    min-height: 100vh;
+    margin: 0 auto;
+    padding: 16px;
+    background: url('../assets/gym1.jpg') no-repeat center center fixed;
+    background-size: cover;
+    backdrop-filter: blur(8px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: #fff;
+    overflow-y: auto;
+  }
+  
+  /* Título principal */
+  .gymDiaryTitle {
+    width: 100%;
+    text-align: center;
+    margin: 16px 0;
+    font-size: 1.6rem;
+    color: #00ffe7;
+    text-shadow: 1px 1px 4px rgba(0,0,0,0.7);
+  }
+  
+  /* Grupos de formulario */
+  .formGroup {
+    width: 100%;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .formGroup label {
+    margin-bottom: 6px;
+    font-size: 0.9rem;
+    color: #00ffe7;
+  }
+  
+  .formGroup input,
+  .formGroup select,
+  .formGroup textarea {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    font-size: 1rem;
+    backdrop-filter: blur(4px);
+    outline: none;
+    margin-bottom: 4px;
+  }
+  
+  /* Dropdown legible */
+  .formGroup select {
+    background: rgba(255,255,255,0.2);
+  }
+  
+  .formGroup select:focus {
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  
+  .formGroup select option {
+    color: #000;
+    background: #fff;
+  }
+  
+  /* Encabezados y filas de ejercicio */
+  .headersRow,
+  .ejercicioRow {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  
+  .ejercicioRow input {
+    width: 100%;
+  }
+  
+  /* Información secundaria */
+  .ejercicioInfo {
+    width: 100%;
+    font-size: 0.75rem;
+    color: #cfcfcf;
+    margin-top: 6px;
+    padding-left: 6px;
+  }
+  
+  /* Contenedor de pesos */
+  .pesosContainer {
+    width: 100%;
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  .pesosContainer label {
+    flex-shrink: 0;
+  }
+  
+  .pesosContainer input {
+    width: 60px;
+  }
+  
+  /* Botones principales */
+  .addBtn,
+  .saveBtn {
+    width: 100%;
+    padding: 12px 0;
+    margin-top: 8px;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    background: linear-gradient(135deg, #00ffe7, #007aff);
+    transition: transform 0.2s ease, box-shadow 0.3s ease;
+  }
+  
+  .addBtn:hover,
+  .saveBtn:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 10px rgba(0,255,231,0.4);
+  }
+  
+  /* Grupo de botones */
+  .buttonGroup {
+    width: 100%;
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  /* Modal overlay */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 1000;
+  }
+  
+  /* Modal content */
+  .modal-content {
+    width: 100%;
+    max-width: 360px;
+    background: rgba(0,0,0,0.8);
+    padding: 16px;
+    border-radius: 12px;
+    color: #fff;
+  }
+  
+  .modal-content h3 {
+    text-align: center;
+    margin-bottom: 12px;
+    font-size: 1.2rem;
+  }
+  
+  .range-value {
+    display: inline-block;
+    margin-left: 8px;
+    font-size: 1rem;
+    color: #00ffe7;
+  }
+  
+  /* Scrollbar minimalista */
+  .container::-webkit-scrollbar {
+    width: 6px;
+  }
+  .container::-webkit-scrollbar-track {
+    background: rgba(0,0,0,0.2);
+  }
+  .container::-webkit-scrollbar-thumb {
+    background-color: rgba(0,0,0,0.4);
+    border-radius: 3px;
+  }
+  
+  /* Ajustes móviles */
+  @media (max-width: 480px) {
+    .gymDiaryTitle {
+      font-size: 1.4rem;
+    }
+    .formGroup,
+    .headersRow,
+    .ejercicioRow {
+      gap: 4px;
+    }
+    .addBtn,
+    .saveBtn {
+      padding: 10px 0;
+    }
+  }
+  

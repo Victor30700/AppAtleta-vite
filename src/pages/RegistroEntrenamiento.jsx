@@ -1,57 +1,13 @@
-import React, { useEffect, useState } from 'react';
+// src/pages/RegistroEntrenamiento.jsx
+import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../config/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import ConfirmModal from '../components/ConfirmModal';
-import '../styles/RegistroEntrenamiento.css';
 import { useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-
-const generarPDF = () => {
-  const doc = new jsPDF();
-
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  doc.text('AppSprinterGallo - Registros de Entrenamiento', 20, 20);
-
-  const columns = [
-    { header: 'Fecha', dataKey: 'fecha' },
-    { header: 'Plan', dataKey: 'plan' },
-    { header: 'Estado Físico', dataKey: 'estadoFisico' },
-    { header: 'Ánimo', dataKey: 'animo' },
-    { header: 'Sensaciones', dataKey: 'sensaciones' },
-  ];
-
-  const rows = filteredRegistros.map((registro) => ({
-    fecha: registro.fecha || 'N/A',
-    plan: registro.plan || 'Sin plan',
-    estadoFisico: registro.estadoFisico ? `${registro.estadoFisico}/10` : 'N/A',
-    animo: registro.animo || 'N/A',
-    sensaciones: registro.sensaciones || 'N/A',
-  }));
-
-  autoTable(doc, {
-    startY: 30,
-    columns,
-    body: rows,
-    theme: 'grid',
-    styles: { fontSize: 10, cellPadding: 4 },
-    headStyles: {
-      fillColor: [44, 62, 80],
-      textColor: [255, 255, 255],
-      fontStyle: 'bold',
-      halign: 'center',
-    },
-    bodyStyles: {
-      textColor: [50, 50, 50],
-    },
-    margin: { left: 20, right: 20 },
-  });
-
-  doc.save(`AppSprinterGallo-${searchQuery || 'todos'}.pdf`);
-};
-// IMPORTANTE para que funcione autoTable
+import '../styles/RegistroEntrenamiento.css';
 
 export default function RegistroEntrenamiento() {
   const { user, loading } = useAuth();
@@ -65,20 +21,8 @@ export default function RegistroEntrenamiento() {
   const docRegistro = user?.email && doc(db, 'registroEntreno', user.email);
 
   useEffect(() => {
-    if (!loading && user) {
-      loadRegistros();
-    }
+    if (!loading && user) loadRegistros();
   }, [user, loading]);
-
-  // 🔍 Verificación de autoTable
-  useEffect(() => {
-    const doc = new jsPDF();
-    if (typeof doc.autoTable !== 'function') {
-      console.error('❌ autoTable no está disponible en jsPDF');
-    } else {
-      console.log('✅ autoTable está cargado correctamente');
-    }
-  }, []);
 
   const loadRegistros = async () => {
     const snap = await getDoc(docRegistro);
@@ -88,74 +32,121 @@ export default function RegistroEntrenamiento() {
     setLoadingRegs(false);
   };
 
+  const filteredRegistros = useMemo(
+    () => registros.filter(r => {
+      if (!searchQuery) return true;
+      const [y, m] = searchQuery.split('-');
+      const [ry, rm] = r.fecha.split('-');
+      return ry === y && rm === m;
+    }),
+    [registros, searchQuery]
+  );
+
+  // Eliminar
   const handleDelete = idx => {
     setDeleteIdx(idx);
     setShowDeleteModal(true);
   };
-
   const confirmDelete = async () => {
-    const filtered = registros.filter((_, i) => i !== deleteIdx);
-    await setDoc(docRegistro, { registros: filtered });
-    setRegistros(filtered);
+    const next = registros.filter((_, i) => i !== deleteIdx);
+    await setDoc(docRegistro, { registros: next });
+    setRegistros(next);
     setShowDeleteModal(false);
   };
 
-  const handleEdit = idx => {
-    const record = { ...registros[idx], index: idx };
-    navigate('/registro/nuevo', { state: { editRecord: record } });
+  // Copiar
+  const handleCopy = idx => {
+    const r = filteredRegistros[idx];
+    let text = `Plan:\n${r.plan || 'Sin plan'}\n\n`;
+    text += 'Series registradas:\n';
+    if (r.series?.length) {
+      r.series.forEach(s => {
+        text += `• ${s.distancia || s.pruebaKey || '–'}: ${s.porcentaje}% → ${s.sugerido}s\n`;
+      });
+    } else {
+      text += 'No registradas\n';
+    }
+    text += '\nRegistro de repeticiones:\n';
+    if (r.promedios?.length) {
+      r.promedios.forEach(p => {
+        text += `• ${p.pruebaKey || '–'}: [${p.series.join(', ')}]\n`;
+      });
+    } else {
+      text += 'No registradas\n';
+    }
+    text += `\nEstado físico: ${r.estadoFisico}/10\n`;
+    text += `Ánimo: ${r.animo}\n`;
+    text += `Horas de sueño (1–10): ${r.sleepHours ?? '–'}\n`;
+
+    navigator.clipboard.writeText(text)
+      .then(() => alert('Registro copiado al portapapeles'))
+      .catch(() => alert('No se pudo copiar'));
   };
 
-  const filteredRegistros = registros.filter(r => {
-    if (!searchQuery) return true;
-    const [year, month] = searchQuery.split('-');
-    const [rYear, rMonth] = r.fecha.split('-');
-    return (!year || rYear === year) && (!month || rMonth === month);
-  });
+  // Generar PDF
+  const generarPDF = () => {
+    const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+    doc.setFontSize(18);
+    doc.text('SprinterApp - Entrenamientos Registrados', 40, 40);
 
-const generarPDF = () => {
-  const doc = new jsPDF();
+    // Definimos columnas
+    const cols = [
+      { header: 'Fecha', dataKey: 'fecha' },
+      { header: 'Plan', dataKey: 'plan' },
+      { header: 'Series Registradas', dataKey: 'series' },
+      { header: 'Registro de Repeticiones', dataKey: 'registro' },
+      { header: 'Estado Físico', dataKey: 'estadoFisico' },
+      { header: 'Ánimo', dataKey: 'animo' },
+      { header: 'Horas Sueño', dataKey: 'sleepHours' },
+    ];
 
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  doc.text('AppSprinterGallo - Registros de Entrenamiento', 20, 20);
+    // Preparamos filas
+    const rows = filteredRegistros.map(r => ({
+      fecha: r.fecha,
+      plan: r.plan || 'N/A',
+      series: r.series
+        ? r.series.map(s => `${s.distancia||s.pruebaKey||'–'}:${s.porcentaje}%→${s.sugerido}s`).join('; ')
+        : '–',
+      registro: r.promedios
+        ? r.promedios.map(p => `${p.pruebaKey||'–'}:[${p.series.join(',')}]`).join('; ')
+        : '–',
+      estadoFisico: `${r.estadoFisico}/10`,
+      animo: r.animo,
+      sleepHours: r.sleepHours ?? '–',
+    }));
 
-  const columns = [
-    { header: 'Fecha', dataKey: 'fecha' },
-    { header: 'Plan', dataKey: 'plan' },
-    { header: 'Estado Físico', dataKey: 'estadoFisico' },
-    { header: 'Ánimo', dataKey: 'animo' },
-    { header: 'Sensaciones', dataKey: 'sensaciones' },
-  ];
+    autoTable(doc, {
+      startY: 70,
+      head: [cols.map(c => c.header)],
+      body: rows.map(row => cols.map(c => row[c.dataKey])),
+      theme: 'grid',
+      margin: { top: 80, left: 40, right: 40, bottom: 40 },
+      styles: {
+        fontSize: 10,
+        cellPadding: 6,
+        overflow: 'linebreak'
+      },
+      headStyles: {
+        fillColor: [33, 47, 61],
+        textColor: 255,
+        fontStyle: 'bold',
+        halign: 'center'
+      },
+      columnStyles: {
+        // Aseguramos que la suma de anchos quede dentro de ~532pt (612 - 2×40)
+        fecha: { cellWidth: 60 },
+        plan: { cellWidth: 150 },
+        series: { cellWidth: 80 },
+        registro: { cellWidth: 80 },
+        estadoFisico: { cellWidth: 60 },
+        animo: { cellWidth: 50 },
+        sleepHours: { cellWidth: 50 },
+      },
+      tableWidth: 'auto',
+    });
 
-  const rows = filteredRegistros.map((registro) => ({
-    fecha: registro.fecha || 'N/A',
-    plan: registro.plan || 'Sin plan',
-    estadoFisico: registro.estadoFisico ? `${registro.estadoFisico}/10` : 'N/A',
-    animo: registro.animo || 'N/A',
-    sensaciones: registro.sensaciones || 'N/A',
-  }));
-
-  autoTable(doc, {
-    startY: 30,
-    columns,
-    body: rows,
-    theme: 'grid',
-    styles: { fontSize: 10, cellPadding: 4 },
-    headStyles: {
-      fillColor: [44, 62, 80],
-      textColor: [255, 255, 255],
-      fontStyle: 'bold',
-      halign: 'center',
-    },
-    bodyStyles: {
-      textColor: [50, 50, 50],
-    },
-    margin: { left: 20, right: 20 },
-  });
-
-  doc.save(`AppSprinterGallo-${searchQuery || 'todos'}.pdf`);
-};
-
+    doc.save(`SprinterApp-Entrenamientos-${searchQuery||'todos'}.pdf`);
+  };
 
   if (loading || loadingRegs) return <p>Cargando...</p>;
   if (!user) return <p>Acceso denegado</p>;
@@ -174,7 +165,7 @@ const generarPDF = () => {
       </button>
 
       <div className="form-group">
-        <label>Buscar por mes/año (ej: 2025-04)</label>
+        <label>Buscar mes/año:</label>
         <input
           type="month"
           value={searchQuery}
@@ -190,11 +181,44 @@ const generarPDF = () => {
 
       {filteredRegistros.map((r, idx) => (
         <div key={idx} className="historial-row">
-          <div>
-            <strong>{r.fecha}</strong> — {r.plan || 'Sin plan especificado'} — {r.estadoFisico}/10
+          <div className="registro-clave">
+            <p><strong>{r.fecha}</strong></p>
+            <ul>
+              <li><strong>Plan:</strong> {r.plan || 'Sin plan'}</li>
+              <li>
+                <strong>Series registradas:</strong>
+                {r.series?.length
+                  ? <ul>
+                      {r.series.map((s,i)=>(
+                        <li key={i}>
+                          {s.distancia || s.pruebaKey || '–'}: {s.porcentaje}% → {s.sugerido}s
+                        </li>
+                      ))}
+                    </ul>
+                  : ' No registradas'}
+              </li>
+              <li>
+                <strong>Registro de repeticiones:</strong>
+                {r.promedios?.length
+                  ? <ul>
+                      {r.promedios.map((p,i)=>(
+                        <li key={i}>
+                          {p.pruebaKey || '–'}: [{p.series.join(', ')}]
+                        </li>
+                      ))}
+                    </ul>
+                  : ' No registradas'}
+              </li>
+              <li><strong>Estado físico:</strong> {r.estadoFisico}/10</li>
+              <li><strong>Ánimo:</strong> {r.animo}</li>
+              <li><strong>Horas de sueño (1–10):</strong> {r.sleepHours ?? '–'}</li>
+            </ul>
           </div>
           <div className="historial-actions">
-            <button onClick={() => handleEdit(idx)}>Editar</button>
+            <button onClick={() => handleCopy(idx)}>Copiar</button>
+            <button onClick={() => navigate('/registro/nuevo', { state: { editRecord: { ...r, index: idx } } })}>
+              Editar
+            </button>
             <button onClick={() => handleDelete(idx)}>Eliminar</button>
           </div>
         </div>

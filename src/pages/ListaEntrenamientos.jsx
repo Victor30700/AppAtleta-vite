@@ -100,9 +100,7 @@ export default function ListaEntrenamientos() {
       <div className={styles.listaHeader}>
         <button className={styles.back} onClick={() => navigate('/home')}>← Volver</button>
         <h2>Historial de Entrenamientos</h2>
-        <CSVLink data={csvData} filename="historial_entrenamientos.csv" className={styles.export}>
-          Exportar CSV
-        </CSVLink>
+
       </div>
 
       <div className={styles.formGroup}>

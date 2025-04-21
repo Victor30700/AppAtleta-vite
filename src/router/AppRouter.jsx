@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
+
 // Páginas
 import Login from '../pages/Login';
 import Home from '../pages/Home';
@@ -11,10 +12,21 @@ import ListaEntrenamientos from '../pages/ListaEntrenamientos';
 import ControlesPB from '../pages/ControlesPB';
 import RegistroForm from '../pages/RegistroForm';
 import LoadingScreen from '../components/LoadingScreen';
+import ChatGPTPage from '../pages/ChatGPTPage';
 
 // Nuevas páginas para Registro de Gym
 import RegistroGymList from '../pages/RegistroGymList';
 import RegistroGymForm from '../pages/RegistroGymForm';
+// ———> Importa tu nuevo componente:
+import RegistroGymDiario from '../pages/RegistroGymDiario';
+
+import EditarPerfil from '../pages/EditarPerfil';
+
+//
+import PrivatePremiumRoute from '../components/PrivatePremiumRoute';
+
+//import RouteChangeLoader from '../components/RouteChangeLoader';
+import CrearUsuario from '../pages/CrearUsuario';
 
 export default function AppRouter() {
   const { user, loading } = useAuth();
@@ -24,23 +36,29 @@ export default function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Ruta raíz redirige según user */}
+        {/* Ruta raíz */}
         <Route
           path="/"
-          element={user ? <Navigate to="/home" replace /> : <Navigate to="/login" replace />}
+          element={
+            user
+              ? <Navigate to="/home" replace />
+              : <Navigate to="/login" replace />
+          }
         />
 
-        {/* Login */}
+
+        {/* Auth */}
         <Route
           path="/login"
           element={!user ? <Login /> : <Navigate to="/home" replace />}
         />
 
-        {/* Rutas privadas */}
+        {/* Privadas */}
         <Route
           path="/home"
           element={user ? <Home /> : <Navigate to="/login" replace />}
-        />
+        />        
+
         <Route
           path="/partidas"
           element={user ? <Partidas /> : <Navigate to="/login" replace />}
@@ -53,7 +71,6 @@ export default function AppRouter() {
           path="/registro/nuevo"
           element={user ? <RegistroForm /> : <Navigate to="/login" replace />}
         />
-
         <Route
           path="/lista"
           element={user ? <ListaEntrenamientos /> : <Navigate to="/login" replace />}
@@ -63,7 +80,18 @@ export default function AppRouter() {
           element={user ? <ControlesPB /> : <Navigate to="/login" replace />}
         />
 
-        {/* Rutas para registro de gym */}
+<Route
+  path="/editar-usuario"
+  element={user ? <EditarPerfil /> : <Navigate to="/login" replace />}
+/>
+
+<Route
+  path="/crear-usuario"
+  element={!user ? <CrearUsuario /> : <Navigate to="/home" replace />}
+/>
+
+
+        {/* Rutas para registro de gym mensual */}
         <Route
           path="/registro-gym"
           element={user ? <RegistroGymList /> : <Navigate to="/login" replace />}
@@ -72,10 +100,33 @@ export default function AppRouter() {
           path="/registro-gym/nuevo"
           element={user ? <RegistroGymForm /> : <Navigate to="/login" replace />}
         />
+        <Route
+          path="/registro-gym/editar"
+          element={user ? <RegistroGymForm /> : <Navigate to="/login" replace />}
+        />
+
+        {/* ———> Nueva ruta para registro diario */}
+        <Route
+          path="/registro-gym/diario"
+          element={user ? <RegistroGymDiario /> : <Navigate to="/login" replace />}
+        />
+
+        {/* Chat GPT */}
+        {/* <Route path="/chat" element={<ChatGPTPage />} /> */}
+        <Route
+  path="/chat"
+  element={
+    <PrivatePremiumRoute>
+      <ChatGPTPage />
+    </PrivatePremiumRoute>
+  }
+/>
+
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+
     </BrowserRouter>
   );
 }

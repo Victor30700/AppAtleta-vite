@@ -1,30 +1,40 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../config/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { getLatestTime } from '../utils/controlesUtils';
+import { EVENTS } from '../utils/events';
 import ModalPB from '../components/ModalPB';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 import '../styles/ControlesPB.css';
-import { FiArrowLeft } from 'react-icons/fi';
+import { FiArrowLeft, FiCopy, FiEdit, FiTrash2, FiSearch, FiDownload } from 'react-icons/fi';
 
 export default function ControlesPB() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
 
+  // 1) Dropdown de pruebas y filtro de búsqueda
+  const [eventKey, setEventKey] = useState(EVENTS[0].key);
+  const event = EVENTS.find(e => e.key === eventKey);
+  const [searchKey, setSearchKey] = useState('');
+
+  // 2) Inputs del formulario
   const [distancia, setDistancia] = useState('');
-  const [unidad, setUnidad] = useState('m');
   const [tiempo, setTiempo] = useState('');
   const [fecha, setFecha] = useState(null);
   const [sensaciones, setSensaciones] = useState('');
-  const [controles, setControles] = useState({});
 
+  // 3) Datos de Firestore
+  const [controles, setControles] = useState({});
+  const docRef = user?.email && doc(db, 'controlesPB', user.email);
+
+  // 4) Modales y edición
   const [modalType, setModalType] = useState(null);
   const [modalData, setModalData] = useState({});
-
-  const docRef = user?.email && doc(db, 'controlesPB', user.email);
 
   useEffect(() => {
     if (!loading && user?.email) loadControles();
@@ -35,154 +45,187 @@ export default function ControlesPB() {
     setControles(snap.exists() ? snap.data() : {});
   }
 
+  function resetForm() {
+    setDistancia(''); setTiempo(''); setFecha(null); setSensaciones('');
+  }
+
+  // Guardar nuevo control
   const guardarControl = async () => {
-    if (!distancia || !tiempo) return alert('Completa distancia y tiempo');
-    const fechaStr = fecha
-      ? fecha.toISOString().split('T')[0]
-      : new Date().toISOString().split('T')[0];
-
-    const key = `${distancia}${unidad}`;
-    const nuevo = {
-      fecha: fechaStr,
-      tiempo: parseFloat(tiempo),
-      sensaciones: sensaciones.trim() || null
-    };
-
+    let key = eventKey;
+    let valor, unidad;
+    const isCustom = eventKey === 'custom';
+    if (isCustom) {
+      const distVal = parseFloat(distancia);
+      const timeVal = parseFloat(tiempo);
+      if (isNaN(distVal) || isNaN(timeVal)) return alert('Ingresa distancia y tiempo válidos.');
+      key = `${distVal}${event.units[0]}`;
+      valor = timeVal;
+      unidad = 's';
+    } else {
+      valor = parseFloat(event.type === 'time' ? tiempo : distancia);
+      unidad = event.units[0];
+      if (isNaN(valor)) return alert(`Completa el campo de ${event.type === 'time' ? 'tiempo' : 'distancia'}.`);
+    }
+    const fechaStr = fecha ? fecha.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    const nuevo = { fecha: fechaStr, valor, unidad, sensaciones: sensaciones.trim() || '' };
     const data = { ...controles };
-    const arr = data[key] ? [nuevo, ...data[key]] : [nuevo];
-    data[key] = arr;
+    if (data.custom) delete data.custom;
+    data[key] = data[key] ? [nuevo, ...data[key]] : [nuevo];
     await setDoc(docRef, data);
-    resetForm();
-    loadControles();
+    resetForm(); loadControles();
   };
 
-  const resetForm = () => {
-    setDistancia('');
-    setTiempo('');
-    setFecha(null);
-    setSensaciones('');
-  };
-
+  // Abrir modales (usando fecha+valor como identificador único)
   const openEditModal = (key, idx) => {
+    const sorted = [...(controles[key]||[])].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    const rec = sorted[idx];
+    setModalData({
+      key,
+      origFecha: rec.fecha,
+      origValor: rec.valor,
+      newFecha: null,
+      newValor: rec.valor,
+      newSensaciones: rec.sensaciones || ''
+    });
     setModalType('edit');
-    setModalData({ key, idx, ...controles[key][idx] });
   };
   const openDeleteModal = (key, idx) => {
+    const sorted = [...(controles[key]||[])].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    const rec = sorted[idx];
+    setModalData({ key, origFecha: rec.fecha, origValor: rec.valor });
     setModalType('delete');
-    setModalData({ key, idx });
   };
   const closeModal = () => setModalType(null);
 
+  // Editar registro
   const handleEdit = async () => {
-    const { key, idx, fecha: oldFecha, tiempo: oldTiempo, sensaciones: oldSensaciones } = modalData;
-    const newFecha = modalData.newFecha
-      ? modalData.newFecha.toISOString().split('T')[0]
-      : oldFecha;
-    const newTiempo = parseFloat(modalData.newTiempo ?? oldTiempo);
-    const newSensaciones = modalData.newSensaciones ?? oldSensaciones;
-
-    const arr = [...controles[key]];
-    arr[idx] = {
-      fecha: newFecha,
-      tiempo: newTiempo,
-      sensaciones: newSensaciones?.trim() || null
-    };
-
+    const { key, origFecha, origValor, newFecha, newValor, newSensaciones } = modalData;
+    const fechaStr = newFecha ? newFecha.toISOString().split('T')[0] : origFecha;
+    if (isNaN(newValor)) return alert('Valor inválido');
+    const unidad = controles[key][0]?.unidad;
+    const recAct = { fecha: fechaStr, valor: newValor, unidad, sensaciones: newSensaciones.trim() || '' };
+    const arr = (controles[key]||[]).map(r =>
+      r.fecha===origFecha && r.valor===origValor ? recAct : r
+    );
     const data = { ...controles, [key]: arr };
     await setDoc(docRef, data);
-    closeModal();
-    loadControles();
+    closeModal(); loadControles();
   };
 
+  // Eliminar registro
   const handleDelete = async () => {
-    const { key, idx } = modalData;
-    const arr = [...controles[key]];
-    arr.splice(idx, 1);
+    const { key, origFecha, origValor } = modalData;
+    const arr = (controles[key]||[]).filter(r => !(r.fecha===origFecha && r.valor===origValor));
     const data = { ...controles };
-    if (arr.length) data[key] = arr;
-    else delete data[key];
+    if (arr.length) data[key]=arr; else delete data[key];
     await setDoc(docRef, data);
-    closeModal();
-    loadControles();
+    closeModal(); loadControles();
   };
+
+  // Copiar registro
+  const copiarRegistro = async r => {
+    const texto = `📅 Fecha: ${r.fecha}\n📏 ${r.valor}${r.unidad}${r.sensaciones ? `\n🧠 ${r.sensaciones}` : ''}`;
+    await navigator.clipboard.writeText(texto); alert('Copiado');
+  };
+
+  // Exportar listado a PDF con tablas
+  const downloadPDF = () => {
+    const docPDF = new jsPDF();
+    docPDF.setFontSize(18);
+    docPDF.text('SprinterApp - ControlesPB', 14, 20);
+    let startY = 30;
+
+    // Recolectar datos en una sola tabla
+    const tableBody = [];
+    Object.keys(controles)
+      .filter(k => k.includes(searchKey))
+      .forEach(k => {
+        const recs = controles[k].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+        recs.forEach(r => {
+          tableBody.push([k, r.fecha, `${r.valor}${r.unidad}`, r.sensaciones || '']);
+        });
+      });
+
+    docPDF.autoTable({
+      startY,
+      head: [['Prueba','Fecha','Valor','Sensaciones']],
+      body: tableBody,
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [22, 160, 133] },
+      margin: { left: 14, right: 14 }
+    });
+
+    docPDF.save('controlesPB.pdf');
+  };
+
+  // Filtrar claves según búsqueda
+  const filteredKeys = useMemo(() =>
+    Object.keys(controles).filter(k => k.includes(searchKey)),
+    [controles, searchKey]
+  );
 
   if (loading) return <p className="controles-empty">Cargando...</p>;
   if (!user) return <p className="controles-empty">Acceso denegado</p>;
 
   return (
     <div className="controles-container">
-      <button className="back-button" onClick={() => navigate('/home')}>
-        <FiArrowLeft /> Volver
-      </button>
+      <button className="back-button" onClick={()=>navigate('/home')}><FiArrowLeft/> Volver</button>
       <h2 className="controles-title">Controles PB</h2>
+
+      {/* Buscador */}
+      <div className="search-box">
+        <FiSearch/>
+        <input
+          type="text"
+          placeholder="Buscar prueba..."
+          value={searchKey}
+          onChange={e=>setSearchKey(e.target.value)}
+        />
+      </div>
 
       {/* Formulario */}
       <div className="controles-form">
-        <input
-          type="text"
-          placeholder="Distancia (ej. 60)"
-          value={distancia}
-          onChange={e => setDistancia(e.target.value)}
-        />
-        <select value={unidad} onChange={e => setUnidad(e.target.value)}>
-          <option value="m">m</option>
-          <option value="km">km</option>
+        <select value={eventKey} onChange={e=>{setEventKey(e.target.value); resetForm();}}>
+          {EVENTS.map(ev=><option key={ev.key} value={ev.key}>{ev.label}</option>)}
         </select>
-        <input
-          type="number"
-          placeholder="Tiempo (s)"
-          value={tiempo}
-          onChange={e => setTiempo(e.target.value)}
-        />
-        <DatePicker
-          selected={fecha}
-          onChange={date => setFecha(date)}
-          placeholderText="Fecha (opcional)"
-          className="datepicker-input"
-        />
-
-        {/* Campo sensaciones */}
-        <textarea
-          placeholder="Describe tus sensaciones (opcional)"
-          value={sensaciones}
-          onChange={e => setSensaciones(e.target.value)}
-          className="textarea-sensaciones"
-        />
-
-        <button onClick={guardarControl}>Guardar</button>
+        {(event.type==='time'||eventKey==='custom')&&(
+          <input type="number" placeholder="Tiempo (s)" value={tiempo} onChange={e=>setTiempo(e.target.value)} />
+        )}
+        {(event.type==='distance'||eventKey==='custom')&&(
+          <input type="number" placeholder={`Distancia (${event.units[0]})`} value={distancia} onChange={e=>setDistancia(e.target.value)} />
+        )}
+        <DatePicker selected={fecha} onChange={setFecha} placeholderText="Fecha (opcional)" className="datepicker-input" />
+        <textarea placeholder="Sensaciones (opcional)" value={sensaciones} onChange={e=>setSensaciones(e.target.value)} className="textarea-sensaciones" />
+        <button className="btn" onClick={guardarControl}>Guardar</button>
+        <button className="btn secondary" onClick={downloadPDF}><FiDownload/> Descargar PDF</button>
       </div>
 
-      {/* Lista de registros */}
-      {Object.keys(controles).length === 0 ? (
-        <p className="controles-empty">No hay registros aún.</p>
+      {/* Lista de bloques */}
+      {filteredKeys.length===0 ? (
+        <p className="controles-empty">No hay registros.</p>
       ) : (
         <div className="controles-list">
-          {Object.entries(controles).map(([key, registros]) => {
-            const sorted = [...registros].sort((a, b) =>
-              b.fecha.localeCompare(a.fecha)
-            );
-            const latest = getLatestTime(key, controles);
+          {filteredKeys.map(key=>{
+            const sorted=[...(controles[key]||[])].sort((a,b)=>b.fecha.localeCompare(a.fecha));
             return (
               <div key={key} className="controles-distance">
                 <div className="controles-distance-header">
                   <h3>{key}</h3>
-                  <span>Último: {latest ? `${latest}s` : '-'}</span>
+                  <span>Último: {getLatestTime(key,controles)}{sorted[0]?.unidad}</span>
                 </div>
                 <ul>
-                  {sorted.map((r, idx) => (
-                    <li key={idx} className="controles-item">
-                      <span>
-                        {r.fecha} — {r.tiempo}s
-                        {r.sensaciones && (
-                          <div className="sensaciones-text">
-                            <strong>Sensaciones:</strong> {r.sensaciones}
-                          </div>
-                        )}
-                      </span>
-                      <span className="actions">
-                        <button onClick={() => openEditModal(key, idx)}>Editar</button>
-                        <button onClick={() => openDeleteModal(key, idx)}>Eliminar</button>
-                      </span>
+                  {sorted.map((r,idx)=>(
+                    <li key={`${key}-${r.fecha}-${idx}`} className="controles-item">
+                      <div className="registro-content">
+                        <div>📅 <strong>{r.fecha}</strong> — 📏 <strong>{r.valor}{r.unidad}</strong>
+                          {r.sensaciones&&<div className="sensaciones-text">🧠 {r.sensaciones}</div>}
+                        </div>
+                        <div className="actions">
+                          <button onClick={()=>copiarRegistro(r)} title="Copiar"><FiCopy/></button>
+                          <button onClick={()=>openEditModal(key,idx)} title="Editar"><FiEdit/></button>
+                          <button onClick={()=>openDeleteModal(key,idx)} title="Eliminar"><FiTrash2/></button>
+                        </div>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -192,44 +235,29 @@ export default function ControlesPB() {
         </div>
       )}
 
-      {/* Modals */}
-      {modalType === 'edit' && (
+      {/* Modales */}
+      {modalType==='edit'&&(
         <ModalPB isOpen onRequestClose={closeModal} title="Editar Registro">
           <div className="mb-2">
-            <label>Fecha:</label>
-            <DatePicker
-              selected={modalData.newFecha || new Date(modalData.fecha)}
-              onChange={date => setModalData(d => ({ ...d, newFecha: date }))}
-            />
+            <label>Fecha</label>
+            <DatePicker selected={modalData.newFecha||new Date(modalData.origFecha)} onChange={d=>setModalData(md=>({...md,newFecha:d}))} />
           </div>
           <div className="mb-2">
-            <label>Tiempo (s):</label>
-            <input
-              type="number"
-              value={modalData.newTiempo ?? modalData.tiempo}
-              onChange={e => setModalData(d => ({ ...d, newTiempo: e.target.value }))}
-            />
+            <label>Valor</label>
+            <input type="number" value={modalData.newValor} onChange={e=>setModalData(md=>({...md,newValor:parseFloat(e.target.value)}))} />
           </div>
           <div className="mb-2">
-            <label>Sensaciones:</label>
-            <textarea
-              value={modalData.newSensaciones ?? modalData.sensaciones ?? ''}
-              onChange={e => setModalData(d => ({ ...d, newSensaciones: e.target.value }))}
-              className="textarea-sensaciones"
-            />
+            <label>Sensaciones</label>
+            <textarea value={modalData.newSensaciones} onChange={e=>setModalData(md=>({...md,newSensaciones:e.target.value}))} className="textarea-sensaciones" />
           </div>
-          <button className="modal-action" onClick={handleEdit}>
-            Guardar Cambios
-          </button>
+          <button className="modal-action" onClick={handleEdit}>Actualizar</button>
         </ModalPB>
       )}
-
-      {modalType === 'delete' && (
+      {modalType==='delete'&&(
         <ModalPB isOpen onRequestClose={closeModal} title="Eliminar Registro">
-          <p>¿Seguro que deseas eliminar este registro?</p>
-          <button className="modal-action danger" onClick={handleDelete}>
-            Sí, eliminar
-          </button>
+          <p>¿Confirma eliminar este registro?</p>
+          <button className="modal-action danger" onClick={handleDelete}>Sí, eliminar</button>
+          <button className="modal-action" onClick={closeModal}>Cancelar</button>
         </ModalPB>
       )}
     </div>
