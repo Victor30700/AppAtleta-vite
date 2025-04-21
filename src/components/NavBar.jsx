@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getAuth, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import '../styles/Navbar.css'; // Estilos separados
+import '../styles/NavBar.css'; // Estilos separados
 
 import logo from '../assets/rayo-icon.png'; // Reemplaza con tu logo real
 import { FiLogOut } from 'react-icons/fi';
