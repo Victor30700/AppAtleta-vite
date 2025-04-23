@@ -4,11 +4,14 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 2rem 1rem;
   min-height: 100vh;
   background-color: #0f172a;
   color: #fff;
   position: relative;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  padding: 2rem 1rem;
 }
 
 .home-title {
@@ -96,6 +99,8 @@
     font-size: 2rem;
   }
 }
+
+/* IA Card */
 .ia-card {
   position: relative;
   background: rgba(0, 0, 0, 0.6);
@@ -123,6 +128,7 @@
   cursor: default;
 }
 
+/* Animaciones IA */
 @keyframes pulse-glow {
   0%, 100% {
     transform: scale(1);
@@ -143,14 +149,9 @@
   }
 }
 
-
-
+/* Footer no fijo, estilo premium */
 .home-footer {
-  position: fixed;
-  bottom: 0;
-  left: 0;
   width: 100%;
-  height: 80px;
   background: rgba(12, 12, 12, 0.75);
   backdrop-filter: blur(10px);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -158,9 +159,10 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  z-index: 999;
   font-family: 'Segoe UI', Roboto, sans-serif;
   box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.5);
+  padding: 1rem;
+  margin-top: auto;
 }
 
 .home-footer .brand {
@@ -177,19 +179,47 @@
   opacity: 0.8;
 }
 
-
+/* Calendario */
 .calendar-card {
   background: rgba(255,255,255,0.12);
   border-radius: 1rem;
   transition: background 0.3s, transform 0.2s;
 }
+
 .calendar-card:hover {
   background: rgba(255,255,255,0.25);
   transform: translateY(-5px);
 }
+
 .calendar-icon {
   font-size: 2.5rem;
   color: #ffdd57;
   margin-bottom: 0.5rem;
   filter: drop-shadow(0 0 8px rgba(255,221,87,0.8));
+}
+.rayo-icon {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  margin: 0 6px;
+  vertical-align: middle;
+  animation: flash 1.2s infinite ease-in-out;
+  filter: drop-shadow(0 0 4px #ffd700);
+}
+
+.rayo-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+@keyframes flash {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    filter: drop-shadow(0 0 4px #ffd700);
+  }
+  50% {
+    transform: scale(1.2) rotate(-5deg);
+    filter: drop-shadow(0 0 12px #fff5b7);
+  }
 }

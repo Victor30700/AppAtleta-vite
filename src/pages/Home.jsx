@@ -55,7 +55,25 @@ export default function Home() {
       <Navbar />
 
       <header className="home-header">
-        <h1 className="home-title">SprinterApp</h1>
+        <h1 className="home-title">
+          Sprinter
+          <span className="rayo-icon">
+            <svg viewBox="0 0 64 64" className="rayo-svg">
+              <path
+                d="M30 2 L10 34 H28 L22 62 L54 26 H34 L40 2 Z"
+                fill="url(#gold-gradient)"
+              />
+              <defs>
+                <linearGradient id="gold-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#ffd700" />
+                  <stop offset="50%" stopColor="#ffa500" />
+                  <stop offset="100%" stopColor="#ffcc00" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </span>
+          App
+        </h1>
       </header>
 
       <div className="menu-grid">
@@ -79,8 +97,7 @@ export default function Home() {
           <GiWeightLiftingUp className="menu-icon" />
           <span>Registro GYM</span>
         </Link>
-        {/* Nuevo Calendario de Eventos */}
-        <Link to="/eventos" className="menu-card calendar-card">
+        <Link to="" className="menu-card calendar-card">
           <GiCalendar className="menu-icon calendar-icon" />
           <span>Calendario Eventos en Desarrollo</span>
         </Link>
@@ -93,7 +110,7 @@ export default function Home() {
                 icon: 'info',
                 title: 'Suscripción necesaria',
                 html: `<p>Para acceder a <strong>Coach Nova</strong>, contáctanos:</p>
-                  <a href=\"https://wa.me/59167679528\" target=\"_blank\" class=\"whatsapp-link\">+591 67679528</a>`,
+                  <a href="https://wa.me/59167679528" target="_blank" class="whatsapp-link">+591 67679528</a>`,
                 confirmButtonText: 'Entendido',
               });
           }}
