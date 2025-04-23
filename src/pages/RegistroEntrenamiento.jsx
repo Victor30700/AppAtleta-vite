@@ -1,4 +1,3 @@
-// src/pages/RegistroEntrenamiento.jsx
 import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../config/firebase';
@@ -42,7 +41,6 @@ export default function RegistroEntrenamiento() {
     [registros, searchQuery]
   );
 
-  // Eliminar
   const handleDelete = idx => {
     setDeleteIdx(idx);
     setShowDeleteModal(true);
@@ -54,7 +52,6 @@ export default function RegistroEntrenamiento() {
     setShowDeleteModal(false);
   };
 
-  // Copiar
   const handleCopy = idx => {
     const r = filteredRegistros[idx];
     let text = `Plan:\n${r.plan || 'Sin plan'}\n\n`;
@@ -74,8 +71,16 @@ export default function RegistroEntrenamiento() {
     } else {
       text += 'No registradas\n';
     }
+    text += '\nPromedio de series:\n';
+    if (r.promedios?.length) {
+      r.promedios.forEach(p => {
+        text += `• ${p.pruebaKey || '–'}: ${p.promedio || '-'}\n`;
+      });
+    } else {
+      text += 'No calculado\n';
+    }
     text += `\nEstado físico: ${r.estadoFisico}/10\n`;
-    text += `Ánimo: ${r.animo}\n`;
+    text += `Ánimo: ${r.animo}/5\n`;
     text += `Horas de sueño (1–10): ${r.sleepHours ?? '–'}\n`;
 
     navigator.clipboard.writeText(text)
@@ -83,24 +88,22 @@ export default function RegistroEntrenamiento() {
       .catch(() => alert('No se pudo copiar'));
   };
 
-  // Generar PDF
   const generarPDF = () => {
     const doc = new jsPDF({ unit: 'pt', format: 'letter' });
     doc.setFontSize(18);
     doc.text('SprinterApp - Entrenamientos Registrados', 40, 40);
 
-    // Definimos columnas
     const cols = [
       { header: 'Fecha', dataKey: 'fecha' },
       { header: 'Plan', dataKey: 'plan' },
       { header: 'Series Registradas', dataKey: 'series' },
       { header: 'Registro de Repeticiones', dataKey: 'registro' },
+      { header: 'Promedio de Series', dataKey: 'promedio' },
       { header: 'Estado Físico', dataKey: 'estadoFisico' },
       { header: 'Ánimo', dataKey: 'animo' },
-      { header: 'Horas Sueño', dataKey: 'sleepHours' },
+      { header: 'Horas de Sueño', dataKey: 'sleepHours' },
     ];
 
-    // Preparamos filas
     const rows = filteredRegistros.map(r => ({
       fecha: r.fecha,
       plan: r.plan || 'N/A',
@@ -110,9 +113,12 @@ export default function RegistroEntrenamiento() {
       registro: r.promedios
         ? r.promedios.map(p => `${p.pruebaKey||'–'}:[${p.series.join(',')}]`).join('; ')
         : '–',
-      estadoFisico: `${r.estadoFisico}/10`,
-      animo: r.animo,
-      sleepHours: r.sleepHours ?? '–',
+      promedio: r.promedios
+        ? r.promedios.map(p => `${p.pruebaKey||'–'}:${p.promedio||'-'}`).join('; ')
+        : '–',
+      estadoFisico: `${r.estadoFisico}/10`, 
+      animo: `${r.animo}/5`, 
+      sleepHours: r.sleepHours ?? '–'
     }));
 
     autoTable(doc, {
@@ -121,23 +127,14 @@ export default function RegistroEntrenamiento() {
       body: rows.map(row => cols.map(c => row[c.dataKey])),
       theme: 'grid',
       margin: { top: 80, left: 40, right: 40, bottom: 40 },
-      styles: {
-        fontSize: 10,
-        cellPadding: 6,
-        overflow: 'linebreak'
-      },
-      headStyles: {
-        fillColor: [33, 47, 61],
-        textColor: 255,
-        fontStyle: 'bold',
-        halign: 'center'
-      },
+      styles: { fontSize: 10, cellPadding: 6, overflow: 'linebreak' },
+      headStyles: { fillColor: [33,47,61], textColor: 255, fontStyle: 'bold', halign: 'center' },
       columnStyles: {
-        // Aseguramos que la suma de anchos quede dentro de ~532pt (612 - 2×40)
         fecha: { cellWidth: 60 },
-        plan: { cellWidth: 150 },
+        plan: { cellWidth: 120 },
         series: { cellWidth: 80 },
         registro: { cellWidth: 80 },
+        promedio: { cellWidth: 80 },
         estadoFisico: { cellWidth: 60 },
         animo: { cellWidth: 50 },
         sleepHours: { cellWidth: 50 },
@@ -154,30 +151,18 @@ export default function RegistroEntrenamiento() {
   return (
     <div className="registro-container">
       <div className="registro-header">
-        <button className="btn btn-back" onClick={() => navigate('/home')}>
-          ⬅ Volver
-        </button>
+        <button className="btn btn-back" onClick={() => navigate('/home')}>⬅ Volver</button>
         <h2>Historial de Entrenamientos</h2>
       </div>
 
-      <button onClick={() => navigate('/registro/nuevo')} className="btn">
-        Nuevo Registro
-      </button>
+      <button onClick={() => navigate('/registro/nuevo')} className="btn">Nuevo Registro</button>
 
       <div className="form-group">
         <label>Buscar mes/año:</label>
-        <input
-          type="month"
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-        />
+        <input type="month" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
       </div>
 
-      {searchQuery && filteredRegistros.length > 0 && (
-        <button className="btn" onClick={generarPDF}>
-          Descargar PDF
-        </button>
-      )}
+      {searchQuery && filteredRegistros.length > 0 && <button className="btn" onClick={generarPDF}>Descargar PDF</button>}
 
       {filteredRegistros.map((r, idx) => (
         <div key={idx} className="historial-row">
@@ -185,52 +170,29 @@ export default function RegistroEntrenamiento() {
             <p><strong>{r.fecha}</strong></p>
             <ul>
               <li><strong>Plan:</strong> {r.plan || 'Sin plan'}</li>
-              <li>
-                <strong>Series registradas:</strong>
-                {r.series?.length
-                  ? <ul>
-                      {r.series.map((s,i)=>(
-                        <li key={i}>
-                          {s.distancia || s.pruebaKey || '–'}: {s.porcentaje}% → {s.sugerido}s
-                        </li>
-                      ))}
-                    </ul>
-                  : ' No registradas'}
-              </li>
-              <li>
-                <strong>Registro de repeticiones:</strong>
-                {r.promedios?.length
-                  ? <ul>
-                      {r.promedios.map((p,i)=>(
-                        <li key={i}>
-                          {p.pruebaKey || '–'}: [{p.series.join(', ')}]
-                        </li>
-                      ))}
-                    </ul>
-                  : ' No registradas'}
-              </li>
+              <li><strong>Series registradas:</strong>{r.series?.length
+                  ? <ul>{r.series.map((s,i)=>(<li key={i}>{s.distancia||s.pruebaKey||'–'}: {s.porcentaje}% → {s.sugerido}s</li>))}</ul>
+                  : ' No registradas'}</li>
+              <li><strong>Registro de repeticiones:</strong>{r.promedios?.length
+                  ? <ul>{r.promedios.map((p,i)=>(<li key={i}>{p.pruebaKey||'–'}: [{p.series.join(', ')}]</li>))}</ul>
+                  : ' No registradas'}</li>
+              <li><strong>Promedio de series:</strong>{r.promedios?.length
+                  ? <ul>{r.promedios.map((p,i)=>(<li key={i}>{p.pruebaKey||'–'}: {p.promedio||'-'}</li>))}</ul>
+                  : ' No calculado'}</li>
               <li><strong>Estado físico:</strong> {r.estadoFisico}/10</li>
-              <li><strong>Ánimo:</strong> {r.animo}</li>
+              <li><strong>Ánimo:</strong> {r.animo}/5</li>
               <li><strong>Horas de sueño (1–10):</strong> {r.sleepHours ?? '–'}</li>
             </ul>
           </div>
           <div className="historial-actions">
             <button onClick={() => handleCopy(idx)}>Copiar</button>
-            <button onClick={() => navigate('/registro/nuevo', { state: { editRecord: { ...r, index: idx } } })}>
-              Editar
-            </button>
+            <button onClick={() => navigate('/registro/nuevo', { state: { editRecord: { ...r, index: idx } } })}>Editar</button>
             <button onClick={() => handleDelete(idx)}>Eliminar</button>
           </div>
         </div>
       ))}
 
-      <ConfirmModal
-        isOpen={showDeleteModal}
-        title="Eliminar Registro"
-        onConfirm={confirmDelete}
-        onCancel={() => setShowDeleteModal(false)}
-        confirmText="Sí, eliminar"
-      >
+      <ConfirmModal isOpen={showDeleteModal} title="Eliminar Registro" onConfirm={confirmDelete} onCancel={() => setShowDeleteModal(false)} confirmText="Sí, eliminar">
         <p>¿Seguro que deseas eliminar este registro?</p>
       </ConfirmModal>
     </div>

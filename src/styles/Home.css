@@ -176,3 +176,20 @@
   color: #bbbbbb;
   opacity: 0.8;
 }
+
+
+.calendar-card {
+  background: rgba(255,255,255,0.12);
+  border-radius: 1rem;
+  transition: background 0.3s, transform 0.2s;
+}
+.calendar-card:hover {
+  background: rgba(255,255,255,0.25);
+  transform: translateY(-5px);
+}
+.calendar-icon {
+  font-size: 2.5rem;
+  color: #ffdd57;
+  margin-bottom: 0.5rem;
+  filter: drop-shadow(0 0 8px rgba(255,221,87,0.8));
+}
