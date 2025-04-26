@@ -22,14 +22,20 @@ export default function RegistroForm() {
   const editRecord = location.state?.editRecord || null;
 
   const [controles, setControles] = useState({});
-  const [plan, setPlan] = useState('');
-  const [gymDone, setGymDone] = useState(false);
-  const [estadoFisico, setEstadoFisico] = useState(5);
-  const [animo, setAnimo] = useState(3);
-  const [sensaciones, setSensaciones] = useState('');
-  const [seriesInputs, setSeriesInputs] = useState([]);
-  const [promedios, setPromedios] = useState([]);
-  const [sleepHours, setSleepHours] = useState(editRecord?.sleepHours?.toString() || '');
+  // Ahora permitimos elegir la fecha o tomar la de editRecord
+  const [fecha, setFecha] = useState(
+    editRecord?.fecha || new Date().toISOString().split('T')[0]
+  );
+  const [plan, setPlan] = useState(editRecord?.plan || '');
+  const [gymDone, setGymDone] = useState(editRecord?.gymDone || false);
+  const [estadoFisico, setEstadoFisico] = useState(editRecord?.estadoFisico || 5);
+  const [animo, setAnimo] = useState(editRecord?.animo || 3);
+  const [sensaciones, setSensaciones] = useState(editRecord?.sensaciones || '');
+  const [seriesInputs, setSeriesInputs] = useState(editRecord?.series || []);
+  const [promedios, setPromedios] = useState(editRecord?.promedios || []);
+  const [sleepHours, setSleepHours] = useState(
+    editRecord?.sleepHours?.toString() || ''
+  );
   const [saving, setSaving] = useState(false);
 
   const sleepRecommendation = useMemo(() => {
@@ -55,8 +61,10 @@ export default function RegistroForm() {
     }
   }, [user]);
 
+  // Cuando editamos, precargamos TODO, incluida la fecha
   useEffect(() => {
     if (editRecord) {
+      setFecha(editRecord.fecha);
       setPlan(editRecord.plan || '');
       setGymDone(editRecord.gymDone || false);
       setEstadoFisico(editRecord.estadoFisico || 5);
@@ -95,18 +103,26 @@ export default function RegistroForm() {
   };
 
   const agregarSerie = () =>
-    setSeriesInputs(prev => [...prev, { pruebaKey: '', base: null, porcentaje: '', sugerido: null }]);
+    setSeriesInputs(prev => [
+      ...prev,
+      { pruebaKey: '', base: null, porcentaje: '', sugerido: null }
+    ]);
   const eliminarUltimaSerie = () =>
     setSeriesInputs(prev => prev.slice(0, -1));
   const agregarPromedio = () =>
-    setPromedios(prev => [...prev, { pruebaKey: '', series: [], promedio: null }]);
+    setPromedios(prev => [
+      ...prev,
+      { pruebaKey: '', series: [], promedio: null }
+    ]);
   const eliminarUltimoPromedio = () =>
     setPromedios(prev => prev.slice(0, -1));
 
   const calcularPromedios = () => {
     setPromedios(prev =>
       prev.map(p => {
-        const vals = p.series.map(s => parseFloat(s)).filter(n => !isNaN(n));
+        const vals = p.series
+          .map(s => parseFloat(s))
+          .filter(n => !isNaN(n));
         const prom = vals.length
           ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2)
           : null;
@@ -120,7 +136,7 @@ export default function RegistroForm() {
     setSaving(true);
     try {
       const nuevo = {
-        fecha: editRecord?.fecha || new Date().toISOString().split('T')[0],
+        fecha,
         plan: plan.trim(),
         gymDone,
         estadoFisico,
@@ -129,7 +145,7 @@ export default function RegistroForm() {
         sleepHours: sleepHours ? Number(sleepHours) : null,
         sleepRecommendation,
         series: seriesInputs,
-        promedios,
+        promedios
       };
 
       const snap = await getDoc(docRegistro);
@@ -157,7 +173,18 @@ export default function RegistroForm() {
         <h2>{editRecord ? 'Editar Registro' : 'Nuevo Registro'}</h2>
       </div>
 
-      {/* Plan */}
+      {/* Fecha de entrenamiento */}
+      <div className="form-group">
+        <label>Fecha de entrenamiento</label>
+        <input
+          type="date"
+          value={fecha}
+          onChange={e => setFecha(e.target.value)}
+          disabled={saving}
+        />
+      </div>
+
+      {/* Plan de entrenamiento */}
       <div className="form-group">
         <label>Plan de entrenamiento</label>
         <textarea
@@ -201,7 +228,9 @@ export default function RegistroForm() {
           >
             <option value="">Selecciona prueba</option>
             {Object.keys(controles).map(key => (
-              <option key={key} value={key}>{key}</option>
+              <option key={key} value={key}>
+                {key}
+              </option>
             ))}
           </select>
           <span>{e.base ?? '-'}</span>
@@ -212,13 +241,21 @@ export default function RegistroForm() {
             onChange={v => handleSeriesChange(i, 'porcentaje', v.target.value)}
             disabled={saving}
           />
-          <button onClick={() => calcularSugerido(i)} disabled={saving}>Calcular</button>
+          <button onClick={() => calcularSugerido(i)} disabled={saving}>
+            Calcular
+          </button>
           <span>{e.sugerido ?? '-'}</span>
         </div>
       ))}
       <div className="button-group-inline">
-        <button className="btn" onClick={agregarSerie} disabled={saving}>Agregar prueba</button>
-        <button className="btn danger" onClick={eliminarUltimaSerie} disabled={!seriesInputs.length || saving}>
+        <button className="btn" onClick={agregarSerie} disabled={saving}>
+          Agregar prueba
+        </button>
+        <button
+          className="btn danger"
+          onClick={eliminarUltimaSerie}
+          disabled={!seriesInputs.length || saving}
+        >
           Eliminar prueba
         </button>
       </div>
@@ -252,22 +289,38 @@ export default function RegistroForm() {
               disabled={saving}
             />
           ))}
-          <button onClick={() => {
-            const copy = [...promedios];
-            copy[i].series.push('');
-            setPromedios(copy);
-          }} disabled={saving}>+ Serie</button>
-          <button onClick={() => {
-            const copy = [...promedios];
-            copy[i].series = copy[i].series.slice(0, -1);
-            setPromedios(copy);
-          }} disabled={!p.series.length || saving}>- Serie</button>
+          <button
+            onClick={() => {
+              const copy = [...promedios];
+              copy[i].series.push('');
+              setPromedios(copy);
+            }}
+            disabled={saving}
+          >
+            + Serie
+          </button>
+          <button
+            onClick={() => {
+              const copy = [...promedios];
+              copy[i].series = copy[i].series.slice(0, -1);
+              setPromedios(copy);
+            }}
+            disabled={!p.series.length || saving}
+          >
+            - Serie
+          </button>
           <span>Promedio: {p.promedio ?? '-'}</span>
         </div>
       ))}
       <div className="button-group-inline">
-        <button className="btn" onClick={agregarPromedio} disabled={saving}>Agregar bloque de repes</button>
-        <button className="btn danger" onClick={eliminarUltimoPromedio} disabled={!promedios.length || saving}>
+        <button className="btn" onClick={agregarPromedio} disabled={saving}>
+          Agregar bloque de repes
+        </button>
+        <button
+          className="btn danger"
+          onClick={eliminarUltimoPromedio}
+          disabled={!promedios.length || saving}
+        >
           Eliminar bloque
         </button>
       </div>
@@ -317,7 +370,9 @@ export default function RegistroForm() {
           onChange={e => setSleepHours(e.target.value)}
           disabled={saving}
         />
-        {sleepRecommendation && <p className="sleep-msg">{sleepRecommendation}</p>}
+        {sleepRecommendation && (
+          <p className="sleep-msg">{sleepRecommendation}</p>
+        )}
       </div>
 
       {/* Guardar */}

@@ -27,6 +27,9 @@ import PrivatePremiumRoute from '../components/PrivatePremiumRoute';
 
 //import RouteChangeLoader from '../components/RouteChangeLoader';
 import CrearUsuario from '../pages/CrearUsuario';
+import  RegistroLesion from '../pages/RegistroLesion';
+import RegistroPesoCorporal from '../pages/RegistroPesoCorporal';
+import HealthProfilePage from '../pages/HealthProfilePage';
 
 export default function AppRouter() {
   const { user, loading } = useAuth();
@@ -110,7 +113,21 @@ export default function AppRouter() {
           path="/registro-gym/diario"
           element={user ? <RegistroGymDiario /> : <Navigate to="/login" replace />}
         />
-
+        {/* Perfil de Salud: aquí solo exponemos la “página contenedora” */}
+        <Route
+           path="/health-profile"
+           element={user ? <HealthProfilePage /> : <Navigate to="/login" replace />}
+        />
+        {/* Sub-ruta Peso y Altura */}
+        <Route
+          path="/health-profile/peso-altura"
+          element={user ? <RegistroPesoCorporal /> : <Navigate to="/login" replace />}
+        />
+        {/* Sub-ruta Lesiones */}
+        <Route
+          path="/health-profile/lesiones"
+          element={user ? <RegistroLesion /> : <Navigate to="/login" replace />}    
+        />
         {/* Chat GPT */}
         {/* <Route path="/chat" element={<ChatGPTPage />} /> */}
         <Route

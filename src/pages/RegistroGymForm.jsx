@@ -118,7 +118,7 @@ export default function RegistroGymForm() {
   return (
     <div className="gym-form-container">
       <button className="btn back" onClick={() => navigate(-1)}>← Volver</button>
-      <h2>{registroId ? 'Editar Registro GYM' : 'Nuevo Registro GYM'}</h2>
+      <h2>{registroId ? 'Editar Registro GYM' : ''}</h2>
 
       <div className="form-group">
         <label>Peso corporal (kg)</label>

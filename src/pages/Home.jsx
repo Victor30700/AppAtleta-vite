@@ -7,6 +7,7 @@ import { GiFinishLine, GiNotebook, GiArchiveRegister, GiStopwatch, GiWeightLifti
 import { FiLogOut } from 'react-icons/fi';
 import backgroundImage from '../assets/pista5.jpg';
 import { BiBrain } from 'react-icons/bi';
+import { FaHeartbeat } from 'react-icons/fa';  // <–– import ícono de salud
 import Navbar from '../components/NavBar';
 
 import { getAuth } from 'firebase/auth';
@@ -118,6 +119,10 @@ export default function Home() {
           <BiBrain className="menu-icon ia-icon" />
           <span>Coach Nova</span>
         </div>
+        {/* Nueva opción de salud */}
+        <Link to="/health-profile" className="menu-card health-card">
+          <FaHeartbeat className="menu-icon health-icon" />
+          <span>Perfil de Salud</span></Link>
       </div>
 
       <footer className="home-footer">
