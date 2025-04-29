@@ -20,19 +20,22 @@ import {
   subDays,
   subWeeks,
   parseISO,
-  isSameDay,
   startOfWeek,
   endOfWeek,
-  addDays
+  startOfDay,
+  endOfDay,
+  isWithinInterval,
+  differenceInCalendarWeeks
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 import '../styles/ChatGPTPage.css';
 
 const COMPONENTS = {
-  GYM: 'gym',
+  USER: 'user',
   ATLETISMO: 'atletismo',
+  GYM: 'gym',
   CONTROLES: 'controles',
-  USER: 'user'
+  HEALTH: 'health'
 };
 
 const normalizeDate = dateStr => {
@@ -42,25 +45,19 @@ const normalizeDate = dateStr => {
 
 export default function ChatGPTPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const db = getFirestore(app);
+  const messagesEndRef = useRef(null);
+
   const [messages, setMessages] = useState([{
     role: 'system',
-    content: `Eres Coach Nova, un entrenador 360° experto en:
-• Nutrición deportiva
-• Atletismo
-• Psicología deportiva
-• Fisioterapia
-
-Respondes **solo** con los datos existentes del usuario cuando pregunte por sus registros,
-pero en cada respuesta añades un consejo útil o un comentario amigable que dé un toque humano.`
+    content: `Eres Coach Nova, un entrenador 360° experto en nutrición deportiva, atletismo, psicología deportiva y fisioterapia.
+Cuando el usuario pregunte por sus registros, respondes solo con sus datos existentes y siempre añades un consejo útil y amigable.`
   }]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [showRecommendation, setShowRecommendation] = useState(true);
-  const messagesEndRef = useRef(null);
-  const db = getFirestore(app);
-  const navigate = useNavigate();
 
-  // auto-hide recomendaciones
   useEffect(() => {
     if (showRecommendation) {
       const id = setTimeout(() => setShowRecommendation(false), 10000);
@@ -68,12 +65,9 @@ pero en cada respuesta añades un consejo útil o un comentario amigable que dé
     }
   }, [showRecommendation]);
 
-  // auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  const handleCloseRecommendation = () => setShowRecommendation(false);
 
   const handleDownloadPDF = () => {
     const pdf = new jsPDF();
@@ -83,9 +77,8 @@ pero en cada respuesta añades un consejo útil o un comentario amigable que dé
     y += 10;
     messages.slice(1).forEach(msg => {
       if (y > 280) { pdf.addPage(); y = 20; }
-      pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(`${msg.role==='user'?'Tú':'Coach Nova'}:`, 20, y);
+      pdf.setFont('helvetica', 'bold').setFontSize(12);
+      pdf.text(`${msg.role === 'user' ? 'Tú' : 'Coach Nova'}:`, 20, y);
       y += 8;
       pdf.setFont('helvetica', 'normal');
       pdf.splitTextToSize(msg.content, 170).forEach(line => {
@@ -96,191 +89,304 @@ pero en cada respuesta añades un consejo útil o un comentario amigable que dé
     pdf.save('historial_coach_nova.pdf');
   };
 
-  // --- Fetchers ---
+  // Funciones de obtención de datos mejoradas
   const fetchTrainingRecords = async () => {
     const snap = await getDoc(doc(db, 'registroEntreno', user.email));
     return snap.exists()
-      ? snap.data().registros.map(r => ({ ...r, fecha: normalizeDate(r.fecha), tipo: COMPONENTS.ATLETISMO }))
-      : [];
-  };
-  const fetchGymRecords = async () => {
-    const q = query(collection(db,'registrosGym'), where('metadata.email','==',user.email));
-    const snap = await getDocs(q);
-    return snap.docs.map(d => ({
-      ...d.data(),
-      tipo: COMPONENTS.GYM,
-      fecha: normalizeDate(d.data().metadata.actualizadoEn),
-      plan: d.data().plan.descripcion || d.data().plan,
-      zona: d.data().zona || 'General',
-      ejercicios: d.data().ejercicios || []
-    }));
-  };
-  const fetchDailyGymRecords = async () => {
-    const snap = await getDoc(doc(db,'registroGymDiario',user.email));
-    return snap.exists()
       ? snap.data().registros.map(r => ({
-          ...r, tipo: COMPONENTS.GYM,
+          ...r,
           fecha: normalizeDate(r.fecha),
-          plan: r.plan,
-          zona: r.zona || 'General',
-          ejercicios: r.ejercicios
+          tipo: COMPONENTS.ATLETISMO
         }))
       : [];
   };
+
+  const fetchGymRecords = async () => {
+    const [mensual, diario] = await Promise.all([
+      getDoc(doc(db, 'registrosGym', user.email)),
+      getDoc(doc(db, 'registroGymDiario', user.email))
+    ]);
+    
+    return [
+      ...(mensual.exists() ? mensual.data().registros : []),
+      ...(diario.exists() ? diario.data().registros : [])
+    ].map(r => ({
+      ...r,
+      fecha: normalizeDate(r.fecha),
+      tipo: COMPONENTS.GYM
+    }));
+  };
+
   const fetchControlesPB = async () => {
-    const snap = await getDoc(doc(db,'controlesPB',user.email));
+    const snap = await getDoc(doc(db, 'controlesPB', user.email));
     if (!snap.exists()) return [];
     return Object.entries(snap.data()).flatMap(([prueba, regs]) =>
       regs.map(r => ({
-        prueba,
         ...r,
-        tipo: COMPONENTS.CONTROLES,
-        fecha: normalizeDate(r.fecha)
+        prueba: prueba.replace('n', 'm'), // Corregir typo 120n => 120m
+        fecha: normalizeDate(r.fecha),
+        tipo: COMPONENTS.CONTROLES
       }))
     );
   };
+
+  const fetchHealthData = async () => {
+    const snap = await getDoc(doc(db, 'healthProfiles', user.email));
+    if (!snap.exists()) return { entries: [], injuries: [] };
+    
+    return {
+      entries: (snap.data().bodyEntries || []).map(e => ({
+        ...e,
+        fecha: normalizeDate(e.date),
+        tipo: COMPONENTS.HEALTH
+      })),
+      injuries: (snap.data().injuries || []).map(i => ({
+        ...i,
+        fecha: normalizeDate(i.date),
+        tipo: COMPONENTS.HEALTH,
+        active: i.active === true
+      }))
+    };
+  };
+
   const fetchUserData = async () => {
-    const snap = await getDoc(doc(db,'users',user.uid));
+    const snap = await getDoc(doc(db, 'users', user.uid));
     return snap.exists() ? snap.data() : null;
   };
 
-  // --- Fecha parser ---
+  // Mejorado: Manejo preciso de fechas relativas
   const parseDateFromText = text => {
-    const today = new Date(), lower = text.toLowerCase();
-    const days = ['lunes','martes','miércoles','jueves','viernes','sábado','domingo'];
-    const found = days.find(d=>lower.includes(d));
-    if (found) {
-      const idx = days.indexOf(found);
-      const start = startOfWeek(today,{locale:es}), target = addDays(start,idx);
-      if (lower.includes('semana pasada')) return {start: subWeeks(target,1), end: subWeeks(target,1)};
-      return {start: target, end: target};
-    }
-    let m = text.match(/(\d{4}-\d{2}-\d{2})/);
-    if (m) { const d=parseISO(m[1]); return {start:d,end:d}; }
-    m = text.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-    if (m) { const d=parseISO(`${m[3]}-${m[2]}-${m[1]}`); return {start:d,end:d}; }
-    if (/hoy/.test(lower)) return {start:today,end:today};
-    if (/ayer/.test(lower)) { const d=subDays(today,1); return {start:d,end:d}; }
-    if (/antes de ayer|anteayer/.test(lower)) { const d=subDays(today,2); return {start:d,end:d}; }
+    const today = new Date();
+    const lower = text.toLowerCase();
+    
+    // Manejar semanas completas
     if (/semana pasada/.test(lower)) {
       return {
-        start: subWeeks(startOfWeek(today,{locale:es}),1),
-        end:   subWeeks(endOfWeek(today,{locale:es}),1)
+        start: subWeeks(startOfWeek(today, { locale: es }), 1),
+        end: subWeeks(endOfWeek(today, { locale: es }), 1)
       };
     }
+
+    // Manejar días de la semana
+    const days = ['lunes','martes','miércoles','jueves','viernes','sábado','domingo'];
+    const foundDay = days.find(d => lower.includes(d));
+    
+    if (foundDay) {
+      const targetDayIndex = days.indexOf(foundDay);
+      const currentDayIndex = today.getDay();
+      let diff = currentDayIndex - (targetDayIndex === 0 ? 7 : targetDayIndex);
+      
+      if (diff < 0) diff += 7;
+      const date = subDays(today, diff);
+      
+      if (differenceInCalendarWeeks(today, date) >= 1) {
+        return { start: subWeeks(date, 1), end: subWeeks(date, 1) };
+      }
+      return { start: date, end: date };
+    }
+
+    // Manejar fechas absolutas
+    const dateFormats = [
+      { regex: /(\d{4})-(\d{2})-(\d{2})/, fn: (y, m, d) => parseISO(`${y}-${m}-${d}`) },
+      { regex: /(\d{2})\/(\d{2})\/(\d{4})/, fn: (d, m, y) => parseISO(`${y}-${m}-${d}`) }
+    ];
+    
+    for (const format of dateFormats) {
+      const match = text.match(format.regex);
+      if (match) {
+        const date = format.fn(...match.slice(1));
+        return { start: date, end: date };
+      }
+    }
+
+    // Manejar referencias relativas
+    const relativeDates = {
+      hoy: today,
+      ayer: subDays(today, 1),
+      anteayer: subDays(today, 2)
+    };
+    
+    for (const [key, date] of Object.entries(relativeDates)) {
+      if (lower.includes(key)) return { start: date, end: date };
+    }
+
     return null;
   };
 
-  const filterRecords = (recs, range) => {
-    if (!range) return [];
-    return recs.filter(r => {
-      try { return isSameDay(parseISO(r.fecha), range.start); }
-      catch { return false; }
+  // Filtrado mejorado por fecha y tipo
+  const filterRecords = (records, range, types) => {
+    if (!range || !types.length) return [];
+    
+    return records.filter(r => {
+      const recordDate = parseISO(r.fecha);
+      return (
+        isWithinInterval(recordDate, { 
+          start: startOfDay(range.start), 
+          end: endOfDay(range.end)
+        }) && types.includes(r.tipo)
+      );
     });
   };
 
-  // --- Generadores ---
-  const genUser = ud => ud
-    ? `¡Hola ${ud.fullName.split(' ')[0]}! 👋
-Soy Coach Nova, tu entrenador 360°.
-Tipo de corredor: ${ud.tipoCorredor}
-Edad: ${ud.age} años.
-¡Vamos con todo!`
-    : '';
-
-  const genRecord = rec => {
-    const fd = format(parseISO(rec.fecha),'dd/MM/yyyy');
-    let header=`📅 ${fd} - `, body='', tip='';
-    if (rec.tipo===COMPONENTS.ATLETISMO) {
-      header+='🏃 Entrenamiento de pista\n';
-      body=`Plan completo:\n${rec.plan}\n\n`+
-        `Estado: ${rec.estadoFisico}/10 • Ánimo: ${rec.animo}/5 • Sueño: ${rec.sleepHours}h\n\n`+
-        `Series:\n${rec.series.map(s=>`- ${s.pruebaKey}: base ${s.base}s, %${s.porcentaje}→${s.sugerido||'-'}`).join('\n')}\n\n`+
-        `Promedios:\n${rec.promedios.map(p=>`- ${p.pruebaKey}: ${p.promedio}`).join('\n')}`+
-        (rec.sensaciones?`\n\nSensaciones: ${rec.sensaciones}`:'');
-      tip='💡 Consejo: Hidrátate bien y estira al finalizar.';
-    }
-    if (rec.tipo===COMPONENTS.GYM) {
-      header+=`🏋️ Gimnasio (${rec.zona})\n`;
-      body=`Plan completo:\n${rec.plan}\n\n`+
-        `Ejercicios:\n${rec.ejercicios.map(e=>`- ${e.nombre}: ${e.repeticiones} reps, pesos ${e.pesos.join(', ')}`).join('\n')}`;
-      tip='💡 Consejo: Controla la respiración y baja despacio.';
-    }
-    if (rec.tipo===COMPONENTS.CONTROLES) {
-      header+=`⏱️ Control PB - ${rec.prueba}: ${rec.valor}${rec.unidad}\n`;
-      if (rec.sensaciones) body=`Sensaciones: ${rec.sensaciones}\n`;
-      tip='💡 Consejo: Trabaja tu salida y postura.';
-    }
-    return `${header}${body}\n\n${tip}`;
+  // Generadores de respuestas mejorados
+  const genUserProfile = (userData, healthData) => {
+    const latestHealth = healthData.entries[0] || {};
+    return `¡Hola ${userData.fullName.split(' ')[0]}! 👋
+🏃 Tipo de corredor: ${userData.tipoCorredor}
+📅 Edad: ${userData.age} años
+⚖️ Peso actual: ${latestHealth.weightKg || '--'} kg
+📏 Altura: ${latestHealth.heightM || '--'} m
+${healthData.injuries.some(i => i.active) ? '⚠️ Lesiones activas: ' + healthData.injuries.filter(i => i.active).map(i => i.name).join(', ') : '✅ Sin lesiones activas'}`;
   };
 
-  // --- Detección de tipo de petición ---
-  const detect = text => {
-    const l = text.toLowerCase();
-    // Si pide consejo, plan de nutrición o charla libre
-    if (/\b(consejo|sugerencia|plan de nutrici(o|ó)n|nutrici(o|ó)n|quiero hablar)\b/.test(l)) {
-      return [];
-    }
-    // Perfil
-    if (/\b(quien soy|quién soy|mi perfil|mi nombre)\b/i.test(l)) {
-      return [COMPONENTS.USER];
-    }
-    const comps = [];
-    if (/(gym|pesas|gimnasio)/i.test(l)) comps.push(COMPONENTS.GYM);
-    if (/(atletismo|pista|entreno)/i.test(l)) comps.push(COMPONENTS.ATLETISMO);
-    if (/(controles|marcas|pb|tiempos)/i.test(l)) comps.push(COMPONENTS.CONTROLES);
-    return comps;
+  const genTrainingDetails = (training) => {
+    const date = format(parseISO(training.fecha), 'dd/MM/yyyy');
+    return `📅 ${date} - 🏃 Entrenamiento de pista
+📝 Plan: ${training.plan}
+⚡ Estado: ${training.estadoFisico}/10 | 😄 Ánimo: ${training.animo}/5 | 💤 Sueño: ${training.sleepHours}h
+${training.series?.length ? '🔁 Series:\n' + training.series.map(s => 
+  `- ${s.pruebaKey}: ${s.repeticiones}x${s.distancia} @ ${s.porcentaje}% (${s.base}s)`
+).join('\n') : ''}
+${training.sensaciones ? '\n💬 Sensaciones: ' + training.sensaciones : ''}
+💡 Consejo: ${training.animo < 3 ? 'Trabaja en tu motivación con metas a corto plazo. ' : ''}
+${training.sleepHours < 7 ? 'Prioriza el descanso para mejor recuperación.' : 'Mantén una buena hidratación.'}`;
   };
 
-  // --- Envío de mensaje ---
+  const genGymSession = (session) => {
+    const date = format(parseISO(session.fecha), 'dd/MM/yyyy');
+    return `📅 ${date} - 🏋️ Gimnasio (${session.zona})
+📝 Plan: ${session.plan}
+💪 Ejercicios:
+${session.ejercicios.map(e => `- ${e.nombre}: ${e.repeticiones} reps × ${e.pesos.join(' → ')} kg`).join('\n')}
+💡 Consejo: ${session.zona?.toLowerCase().includes('superior') ? 
+  'Mantén la técnica correcta en press de banca' : 
+  'Controla el movimiento excéntrico'}`;
+  };
+
+  const genHealthEntry = (entry, injuries) => {
+    const date = format(parseISO(entry.fecha), 'dd/MM/yyyy');
+    let response = `📅 ${date} - Registro Corporal
+⚖️ Peso: ${entry.weightKg} kg | 📏 Altura: ${entry.heightM} m
+📊 IMC: ${entry.bmi} (${entry.category}) | 🎯 Ideal: ${entry.idealMinKg}-${entry.idealMaxKg} kg
+${entry.bodyFat ? `📉 Grasa corporal: ${entry.bodyFat}\n` : ''}`;
+
+    if (entry.notes) {
+      const goalMatch = entry.notes.match(/objetivo pesar (\d+) kg/);
+      if (goalMatch) response += `🎯 Objetivo: ${goalMatch[1]} kg\n`;
+    }
+
+    if (injuries.some(i => i.active)) {
+      response += `\n⚠️ Lesiones activas detectadas:\n${injuries.filter(i => i.active)
+        .map(i => `- ${i.name} (desde ${format(parseISO(i.fecha), 'dd/MM')})`).join('\n')}`;
+    }
+
+    response += `\n💡 Nutrición: ${
+      entry.activityLevel === 'Alto' ? 
+      'Aumenta proteínas (2g/kg) y carbohidratos complejos' :
+      'Mantén dieta balanceada con énfasis en vegetales'
+    }${injuries.length ? '\n🍴 Alimentos antiinflamatorios: Pescado, nueces, cúrcuma' : ''}`;
+
+    return response;
+  };
+
+  const genPBControl = (control) => {
+    const date = format(parseISO(control.fecha), 'dd/MM/yyyy');
+    return `📅 ${date} - ⏱️ ${control.prueba}: ${control.valor}${control.unidad}
+${control.sensaciones ? '💬 ' + control.sensaciones : ''}
+💡 Consejo: ${control.prueba <= 100 ? 'Mejora tu salida' : 'Trabaja la distribución de esfuerzo'}`;
+  };
+
+  // Detección de intenciones mejorada
+  const detectIntent = (text) => {
+    const lower = text.toLowerCase();
+    const intents = new Set();
+    
+    if (/(peso|altura|imc|grasa|masa)/.test(lower)) intents.add(COMPONENTS.HEALTH);
+    if (/(lesión|lesion|desgarre|dolor)/.test(lower)) intents.add(COMPONENTS.HEALTH);
+    if (/(tiempo|marca|control|pb|prueba|segundo)/.test(lower)) intents.add(COMPONENTS.CONTROLES);
+    if (/(entreno|atletismo|pista)/.test(lower)) intents.add(COMPONENTS.ATLETISMO);
+    if (/(gym|pesas|ejercicio|musculación)/.test(lower)) intents.add(COMPONENTS.GYM);
+    if (/(quien soy|mi perfil|mis datos)/.test(lower)) intents.add(COMPONENTS.USER);
+    
+    return Array.from(intents);
+  };
+
   const handleSend = async () => {
     if (!input.trim() || loading) return;
     setLoading(true);
     setMessages(ms => [...ms, { role: 'user', content: input }]);
 
-    // Cargar todos los registros
-    const [ud, tren, gymM, gymD, ctr] = await Promise.all([
-      fetchUserData(),
-      fetchTrainingRecords(),
-      fetchGymRecords(),
-      fetchDailyGymRecords(),
-      fetchControlesPB()
-    ]);
-    const all = [...tren, ...gymM, ...gymD, ...ctr];
-
-    const comps = detect(input);
-    const range = parseDateFromText(input);
-
-    let reply = '';
-
-    // 1) Perfil
-    if (comps.length === 1 && comps[0] === COMPONENTS.USER) {
-      reply = genUser(ud);
-    }
-    // 2) Registros con fecha y componente
-    else if (range && comps.length) {
-      const hits = filterRecords(all, range).filter(r => comps.includes(r.tipo));
-      reply = hits.length
-        ? hits.map(genRecord).join('\n\n')
-        : `No encontré registros para "${input}".`;
-    }
-    // 3) Controles PB (sin fecha explícita)
-    else if (!range && comps.includes(COMPONENTS.CONTROLES)) {
-      reply = ctr.map(genRecord).join('\n\n') || 'No tienes controles PB registrados.';
-    }
-    // 4) Chat libre / consejos / planes nutricionales
-    else {
-      const systemCtx = messages[0].content;
-      const snippet = JSON.stringify(all.slice(0, 5));
-      const ai = await sendMessageToGPT([
-        { role: 'system', content: systemCtx },
-        { role: 'user', content: `${input}\n\nContexto (muestra solo 5 registros): ${snippet}…` }
+    try {
+      const [userData, trainings, gyms, pbControls, healthData] = await Promise.all([
+        fetchUserData(),
+        fetchTrainingRecords(),
+        fetchGymRecords(),
+        fetchControlesPB(),
+        fetchHealthData()
       ]);
-      reply = ai.trim();
-    }
+      
+      const allRecords = [
+        ...trainings,
+        ...gyms,
+        ...pbControls,
+        ...healthData.entries,
+        ...healthData.injuries
+      ].sort((a, b) => b.fecha.localeCompare(a.fecha));
 
-    setMessages(ms => [...ms, { role: 'assistant', content: reply }]);
-    setLoading(false);
+      const intents = detectIntent(input);
+      const dateRange = parseDateFromText(input);
+      
+      let reply = '';
+
+      // Manejo de consultas específicas
+      if (intents.includes(COMPONENTS.USER)) {
+        reply = genUserProfile(userData, healthData);
+      }
+      else if (input.match(/\b(\d+m)\b/)) {
+        const distance = input.match(/(\d+m)/)[0].replace('m', '') + 'm';
+        const controls = pbControls.filter(c => c.prueba === distance);
+        reply = controls.length ? 
+          controls.map(genPBControl).join('\n\n') :
+          `No hay registros para ${distance}`;
+      }
+      else if (dateRange && intents.length) {
+        const filtered = filterRecords(allRecords, dateRange, intents);
+        reply = filtered.map(record => {
+          switch(record.tipo) {
+            case COMPONENTS.ATLETISMO: return genTrainingDetails(record);
+            case COMPONENTS.GYM: return genGymSession(record);
+            case COMPONENTS.CONTROLES: return genPBControl(record);
+            case COMPONENTS.HEALTH: 
+              return record.weightKg ? 
+                genHealthEntry(record, healthData.injuries) : 
+                `📅 ${format(parseISO(record.fecha), 'dd/MM/yyyy')} - Lesión: ${record.name} (${record.active ? 'Activa' : 'Recuperada'})`;
+            default: return '';
+          }
+        }).filter(Boolean).join('\n\n') || 'No encontré registros para esta fecha';
+      }
+      else {
+        const context = [
+          ...trainings.slice(0, 3),
+          ...gyms.slice(0, 2),
+          ...healthData.entries.slice(0, 1)
+        ].map(r => JSON.stringify(r)).join('\n');
+        
+        const aiResponse = await sendMessageToGPT([
+          { role: 'system', content: messages[0].content },
+          { role: 'user', content: `Pregunta: ${input}\nContexto:\n${context}` }
+        ]);
+        reply = aiResponse.trim();
+      }
+
+      setMessages(ms => [...ms, { role: 'assistant', content: reply }]);
+    } catch (error) {
+      setMessages(ms => [...ms, { 
+        role: 'assistant', 
+        content: '⚠️ Ocurrió un error al procesar tu solicitud. Intenta nuevamente.' 
+      }]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -293,7 +399,7 @@ Edad: ${ud.age} años.
 
       {showRecommendation && (
         <div className="recommendation-msg">
-          <button className="close-btn" onClick={handleCloseRecommendation}>✖</button>
+          <button className="close-btn" onClick={() => setShowRecommendation(false)}>✖</button>
           <strong>💡 Recomendaciones de uso</strong>
           <p>🔒 Las conversaciones no se almacenan automáticamente.</p>
           <p>🧠 Haz preguntas claras y específicas.</p>
