@@ -30,6 +30,9 @@ import CrearUsuario from '../pages/CrearUsuario';
 import  RegistroLesion from '../pages/RegistroLesion';
 import RegistroPesoCorporal from '../pages/RegistroPesoCorporal';
 import HealthProfilePage from '../pages/HealthProfilePage';
+// nuevo coponente para el registro de eventos
+import RegistroEventos from '../pages/RegistroEventos';
+import CalendarioEventos from '../pages/CalendarioEventos';
 
 export default function AppRouter() {
   const { user, loading } = useAuth();
@@ -131,15 +134,29 @@ export default function AppRouter() {
         {/* Chat GPT */}
         {/* <Route path="/chat" element={<ChatGPTPage />} /> */}
         <Route
-  path="/chat"
-  element={
-    <PrivatePremiumRoute>
-      <ChatGPTPage />
-    </PrivatePremiumRoute>
-  }
-/>
+          path="/chat"
+          element={
+          <PrivatePremiumRoute>
+            <ChatGPTPage />
+            </PrivatePremiumRoute>
+          }/>
+            {/* Ruta calendario */}
 
+            <Route
+              path="/calendario-eventos"
+              element={user
+                ? <CalendarioEventos/>
+                : <Navigate to="/login" replace/>
+              }
+            />
 
+            <Route
+              path="/registro-eventos/:id?"
+              element={user
+                ? <RegistroEventos/>
+                : <Navigate to="/login" replace/>
+              }
+            />
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

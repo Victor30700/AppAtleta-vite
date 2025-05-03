@@ -98,10 +98,11 @@ export default function Home() {
           <GiWeightLiftingUp className="menu-icon" />
           <span>Registro GYM</span>
         </Link>
-        <Link to="" className="menu-card calendar-card">
+        <Link to="/calendario-eventos" className="menu-card calendar-card">
           <GiCalendar className="menu-icon calendar-icon" />
-          <span>Calendario Eventos en Desarrollo</span>
+          <span>Calendario Eventos</span>
         </Link>
+        
         <div
           className={`menu-card ia-card ${!isPremium ? 'disabled' : ''}`}
           onClick={() => {

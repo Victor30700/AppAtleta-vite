@@ -2,6 +2,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getAnalytics } from "firebase/analytics";
+import { getMessaging } from "firebase/messaging";  // <-- importar getMessaging
 
 // Tu configuración de Firebase
 const firebaseConfig = {
@@ -22,5 +23,8 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const analytics = getAnalytics(app);
 
-// 👇 Ahora sí se exporta app
-export { app, auth, db, analytics };
+// Inicializa Messaging
+const messaging = getMessaging(app);
+
+//  Ahora sí se exporta app
+export { app, auth, db, analytics, messaging };
