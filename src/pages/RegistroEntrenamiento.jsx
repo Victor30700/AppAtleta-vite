@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../config/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import ConfirmModal from '../components/ConfirmModal';
+import StatusModal from '../components/StatusModal';
 import { useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -15,6 +16,8 @@ export default function RegistroEntrenamiento() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteIdx, setDeleteIdx] = useState(null);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
   const navigate = useNavigate();
 
   const docRegistro = user?.email && doc(db, 'registroEntreno', user.email);
@@ -45,11 +48,21 @@ export default function RegistroEntrenamiento() {
     setDeleteIdx(idx);
     setShowDeleteModal(true);
   };
+
   const confirmDelete = async () => {
-    const next = registros.filter((_, i) => i !== deleteIdx);
-    await setDoc(docRegistro, { registros: next });
-    setRegistros(next);
-    setShowDeleteModal(false);
+    setStatusMessage('Eliminando registro...');
+    setShowStatusModal(true);
+    try {
+      const next = registros.filter((_, i) => i !== deleteIdx);
+      await setDoc(docRegistro, { registros: next });
+      setRegistros(next);
+    } catch (error) {
+      console.error('Error eliminando:', error);
+      alert('Error al eliminar');
+    } finally {
+      setShowStatusModal(false);
+      setShowDeleteModal(false);
+    }
   };
 
   const handleCopy = idx => {
@@ -88,61 +101,75 @@ export default function RegistroEntrenamiento() {
       .catch(() => alert('No se pudo copiar'));
   };
 
+  const handleEdit = (r, idx) => {
+    setStatusMessage('Cargando datos para edición...');
+    setShowStatusModal(true);
+    setTimeout(() => {
+      setShowStatusModal(false);
+      navigate('/registro/nuevo', { state: { editRecord: { ...r, index: idx } }});
+    }, 500);
+  };
+
   const generarPDF = () => {
-    const doc = new jsPDF({ unit: 'pt', format: 'letter' });
-    doc.setFontSize(18);
-    doc.text('SprinterApp - Entrenamientos Registrados', 40, 40);
+    setStatusMessage('Generando PDF...');
+    setShowStatusModal(true);
+    setTimeout(() => {
+      const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+      doc.setFontSize(18);
+      doc.text('SprinterApp - Entrenamientos Registrados', 40, 40);
 
-    const cols = [
-      { header: 'Fecha', dataKey: 'fecha' },
-      { header: 'Plan', dataKey: 'plan' },
-      { header: 'Series Registradas', dataKey: 'series' },
-      { header: 'Registro de Repeticiones', dataKey: 'registro' },
-      { header: 'Promedio de Series', dataKey: 'promedio' },
-      { header: 'Estado Físico', dataKey: 'estadoFisico' },
-      { header: 'Ánimo', dataKey: 'animo' },
-      { header: 'Horas de Sueño', dataKey: 'sleepHours' },
-    ];
+      const cols = [
+        { header: 'Fecha', dataKey: 'fecha' },
+        { header: 'Plan', dataKey: 'plan' },
+        { header: 'Series Registradas', dataKey: 'series' },
+        { header: 'Registro de Repeticiones', dataKey: 'registro' },
+        { header: 'Promedio de Series', dataKey: 'promedio' },
+        { header: 'Estado Físico', dataKey: 'estadoFisico' },
+        { header: 'Ánimo', dataKey: 'animo' },
+        { header: 'Horas de Sueño', dataKey: 'sleepHours' },
+      ];
 
-    const rows = filteredRegistros.map(r => ({
-      fecha: r.fecha,
-      plan: r.plan || 'N/A',
-      series: r.series
-        ? r.series.map(s => `${s.distancia||s.pruebaKey||'–'}:${s.porcentaje}%→${s.sugerido}s`).join('; ')
-        : '–',
-      registro: r.promedios
-        ? r.promedios.map(p => `${p.pruebaKey||'–'}:[${p.series.join(',')}]`).join('; ')
-        : '–',
-      promedio: r.promedios
-        ? r.promedios.map(p => `${p.pruebaKey||'–'}:${p.promedio||'-'}`).join('; ')
-        : '–',
-      estadoFisico: `${r.estadoFisico}/10`, 
-      animo: `${r.animo}/5`, 
-      sleepHours: r.sleepHours ?? '–'
-    }));
+      const rows = filteredRegistros.map(r => ({
+        fecha: r.fecha,
+        plan: r.plan || 'N/A',
+        series: r.series
+          ? r.series.map(s => `${s.distancia||s.pruebaKey||'–'}:${s.porcentaje}%→${s.sugerido}s`).join('; ')
+          : '–',
+        registro: r.promedios
+          ? r.promedios.map(p => `${p.pruebaKey||'–'}:[${p.series.join(',')}]`).join('; ')
+          : '–',
+        promedio: r.promedios
+          ? r.promedios.map(p => `${p.pruebaKey||'–'}:${p.promedio||'-'}`).join('; ')
+          : '–',
+        estadoFisico: `${r.estadoFisico}/10`, 
+        animo: `${r.animo}/5`, 
+        sleepHours: r.sleepHours ?? '–'
+      }));
 
-    autoTable(doc, {
-      startY: 70,
-      head: [cols.map(c => c.header)],
-      body: rows.map(row => cols.map(c => row[c.dataKey])),
-      theme: 'grid',
-      margin: { top: 80, left: 40, right: 40, bottom: 40 },
-      styles: { fontSize: 10, cellPadding: 6, overflow: 'linebreak' },
-      headStyles: { fillColor: [33,47,61], textColor: 255, fontStyle: 'bold', halign: 'center' },
-      columnStyles: {
-        fecha: { cellWidth: 60 },
-        plan: { cellWidth: 120 },
-        series: { cellWidth: 80 },
-        registro: { cellWidth: 80 },
-        promedio: { cellWidth: 80 },
-        estadoFisico: { cellWidth: 60 },
-        animo: { cellWidth: 50 },
-        sleepHours: { cellWidth: 50 },
-      },
-      tableWidth: 'auto',
-    });
+      autoTable(doc, {
+        startY: 70,
+        head: [cols.map(c => c.header)],
+        body: rows.map(row => cols.map(c => row[c.dataKey])),
+        theme: 'grid',
+        margin: { top: 80, left: 40, right: 40, bottom: 40 },
+        styles: { fontSize: 10, cellPadding: 6, overflow: 'linebreak' },
+        headStyles: { fillColor: [33,47,61], textColor: 255, fontStyle: 'bold', halign: 'center' },
+        columnStyles: {
+          fecha: { cellWidth: 60 },
+          plan: { cellWidth: 120 },
+          series: { cellWidth: 80 },
+          registro: { cellWidth: 80 },
+          promedio: { cellWidth: 80 },
+          estadoFisico: { cellWidth: 60 },
+          animo: { cellWidth: 50 },
+          sleepHours: { cellWidth: 50 },
+        },
+        tableWidth: 'auto',
+      });
 
-    doc.save(`SprinterApp-Entrenamientos-${searchQuery||'todos'}.pdf`);
+      doc.save(`SprinterApp-Entrenamientos-${searchQuery||'todos'}.pdf`);
+      setShowStatusModal(false);
+    }, 500);
   };
 
   if (loading || loadingRegs) return <p>Cargando...</p>;
@@ -186,7 +213,7 @@ export default function RegistroEntrenamiento() {
           </div>
           <div className="historial-actions">
             <button onClick={() => handleCopy(idx)}>Copiar</button>
-            <button onClick={() => navigate('/registro/nuevo', { state: { editRecord: { ...r, index: idx } } })}>Editar</button>
+            <button onClick={() => handleEdit(r, idx)}>Editar</button>
             <button onClick={() => handleDelete(idx)}>Eliminar</button>
           </div>
         </div>
@@ -195,6 +222,12 @@ export default function RegistroEntrenamiento() {
       <ConfirmModal isOpen={showDeleteModal} title="Eliminar Registro" onConfirm={confirmDelete} onCancel={() => setShowDeleteModal(false)} confirmText="Sí, eliminar">
         <p>¿Seguro que deseas eliminar este registro?</p>
       </ConfirmModal>
+
+      <StatusModal
+        isOpen={showStatusModal}
+        message={statusMessage}
+        onRequestClose={() => setShowStatusModal(false)}
+      />
     </div>
   );
 }

@@ -16,6 +16,7 @@
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.5.23",
     "lucide-react": "^0.488.0",
+    "nprogress": "^0.2.0",
     "prop-types": "^15.8.1",
     "react": "^19.0.0",
     "react-calendar": "^5.1.0",

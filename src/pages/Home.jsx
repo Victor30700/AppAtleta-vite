@@ -1,14 +1,14 @@
 // src/pages/Home.jsx
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import '../styles/Home.css';
 import { GiFinishLine, GiNotebook, GiArchiveRegister, GiStopwatch, GiWeightLiftingUp, GiCalendar } from 'react-icons/gi';
-import { FiLogOut } from 'react-icons/fi';
 import backgroundImage from '../assets/pista5.jpg';
 import { BiBrain } from 'react-icons/bi';
-import { FaHeartbeat } from 'react-icons/fa';  // <–– import ícono de salud
+import { FaHeartbeat } from 'react-icons/fa';
 import Navbar from '../components/NavBar';
+import StatusModal from '../components/StatusModal';
 
 import { getAuth } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -19,6 +19,7 @@ export default function Home() {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const [isPremium, setIsPremium] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const auth = getAuth();
   const user = auth.currentUser;
@@ -30,6 +31,21 @@ export default function Home() {
     } catch (err) {
       console.error('Error al cerrar sesión:', err);
     }
+  };
+
+  const navigateWithLoading = (path) => {
+    setIsLoading(true);
+    const timeout = setTimeout(() => {
+      navigate(path);
+    }, 600);
+
+    // Asegurarse de apagar loading si el usuario navega manualmente
+    const stopLoading = () => {
+      clearTimeout(timeout);
+      setIsLoading(false);
+      window.removeEventListener('popstate', stopLoading);
+    };
+    window.addEventListener('popstate', stopLoading);
   };
 
   useEffect(() => {
@@ -54,6 +70,7 @@ export default function Home() {
       }}
     >
       <Navbar />
+      <StatusModal isOpen={isLoading} message="Cargando..." />
 
       <header className="home-header">
         <h1 className="home-title">
@@ -78,36 +95,36 @@ export default function Home() {
       </header>
 
       <div className="menu-grid">
-        <Link to="/partidas" className="menu-card">
+        <div className="menu-card" onClick={() => navigateWithLoading('/partidas')}>
           <GiFinishLine className="menu-icon" />
           <span>Partidas</span>
-        </Link>
-        <Link to="/registro" className="menu-card">
+        </div>
+        <div className="menu-card" onClick={() => navigateWithLoading('/registro')}>
           <GiNotebook className="menu-icon" />
           <span>Registro Entreno</span>
-        </Link>
-        <Link to="/lista" className="menu-card">
+        </div>
+        <div className="menu-card" onClick={() => navigateWithLoading('/lista')}>
           <GiArchiveRegister className="menu-icon" />
           <span>Lista Entrenos</span>
-        </Link>
-        <Link to="/controles" className="menu-card">
+        </div>
+        <div className="menu-card" onClick={() => navigateWithLoading('/controles')}>
           <GiStopwatch className="menu-icon" />
           <span>Controles PB</span>
-        </Link>
-        <Link to="/registro-gym" className="menu-card">
+        </div>
+        <div className="menu-card" onClick={() => navigateWithLoading('/registro-gym')}>
           <GiWeightLiftingUp className="menu-icon" />
           <span>Registro GYM</span>
-        </Link>
-        <Link to="/calendario-eventos" className="menu-card calendar-card">
+        </div>
+        <div className="menu-card calendar-card" onClick={() => navigateWithLoading('/calendario-eventos')}>
           <GiCalendar className="menu-icon calendar-icon" />
           <span>Calendario Eventos</span>
-        </Link>
-        
+        </div>
+
         <div
           className={`menu-card ia-card ${!isPremium ? 'disabled' : ''}`}
           onClick={() => {
-            if (isPremium) navigate('/chat');
-            else
+            if (isPremium) navigateWithLoading('/chat');
+            else {
               Swal.fire({
                 icon: 'info',
                 title: 'Suscripción necesaria',
@@ -115,15 +132,17 @@ export default function Home() {
                   <a href="https://wa.me/59167679528" target="_blank" class="whatsapp-link">+591 67679528</a>`,
                 confirmButtonText: 'Entendido',
               });
+            }
           }}
         >
           <BiBrain className="menu-icon ia-icon" />
           <span>Coach Nova</span>
         </div>
-        {/* Nueva opción de salud */}
-        <Link to="/health-profile" className="menu-card health-card">
+
+        <div className="menu-card health-card" onClick={() => navigateWithLoading('/health-profile')}>
           <FaHeartbeat className="menu-icon health-icon" />
-          <span>Perfil de Salud</span></Link>
+          <span>Perfil de Salud</span>
+        </div>
       </div>
 
       <footer className="home-footer">

@@ -20,12 +20,12 @@ export default function CalendarioEventos() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Referencia corregida usando UID
-  const userEventsRef = collection(db, 'userEvents', user.uid, 'events');
+  const userEventsRef = collection(db, 'userEvents', user?.uid, 'events');
 
   const cargarEventos = async () => {
     setLoading(true);
     try {
+      // ORDEN CORREGIDO: ascendente (eventos más próximos primero)
       const q = query(userEventsRef, orderBy('date', 'asc'));
       const snap = await getDocs(q);
 
@@ -47,10 +47,13 @@ export default function CalendarioEventos() {
       setLoading(false);
     }
   };
-
   useEffect(() => {
     if (user?.uid) cargarEventos();
   }, [user?.uid]);
+
+  const handleEditar = (id) => {
+    navigate(`/registro-eventos/${id}`);
+  };
 
   const handleEliminar = async id => {
     if (!window.confirm('¿Eliminar este evento?')) return;
@@ -63,6 +66,7 @@ export default function CalendarioEventos() {
       alert('Error al eliminar evento');
     }
   };
+
   return (
     <div className={styles.container}>
       <button
