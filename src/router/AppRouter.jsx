@@ -8,7 +8,7 @@ import Login from '../pages/Login';
 import Home from '../pages/Home';
 import Partidas from '../pages/Partidas';
 import RegistroEntrenamiento from '../pages/RegistroEntrenamiento';
-import ListaEntrenamientos from '../pages/ListaEntrenamientos';
+import GraficaRendimiento from '../pages/GraficaRendimiento';
 import ControlesPB from '../pages/ControlesPB';
 import RegistroForm from '../pages/RegistroForm';
 import LoadingScreen from '../components/LoadingScreen';
@@ -78,8 +78,8 @@ export default function AppRouter() {
           element={user ? <RegistroForm /> : <Navigate to="/login" replace />}
         />
         <Route
-          path="/lista"
-          element={user ? <ListaEntrenamientos /> : <Navigate to="/login" replace />}
+          path="/grafica"
+          element={user ? <GraficaRendimiento  /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/controles"

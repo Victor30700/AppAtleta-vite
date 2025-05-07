@@ -1,0 +1,279 @@
+/* ======== CONTENEDOR PRINCIPAL ======== */
+.container {
+  min-height: 100vh;
+  padding: 2rem 1rem;
+  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+  color: #ffffff;
+  font-family: 'Segoe UI', Roboto, sans-serif;
+}
+
+/* ======== ENCABEZADO Y BOTONES ======== */
+.header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.header h1 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  text-shadow: 0 0 8px rgba(0, 255, 255, 0.7);
+}
+
+.backButton {
+  align-self: flex-start;
+  margin-bottom: 1rem;
+  background: rgba(0, 255, 255, 0.15);
+  color: #00ffe7;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: background 0.3s ease;
+  font-weight: bold;
+}
+
+.backButton:hover {
+  background: rgba(0, 255, 255, 0.35);
+}
+
+/* Export Buttons */
+.exportButtons {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.button {
+  background: linear-gradient(135deg, #4b00ff, #8e2de2);
+  color: white;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  border: none;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: bold;
+}
+
+.button:hover {
+  background: linear-gradient(135deg, #6200ff, #a23dee);
+  box-shadow: 0 0 10px rgba(123, 0, 255, 0.7);
+}
+
+/* ======== TABS ======== */
+.tabs {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 2rem;
+  gap: 1rem;
+}
+
+.tab {
+  background: rgba(0, 255, 255, 0.15);
+  color: #00ffe7;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  border: 1px solid rgba(0, 255, 255, 0.2);
+  font-weight: bold;
+}
+
+.tab:hover {
+  background: rgba(0, 255, 255, 0.35);
+}
+
+.active {
+  background: linear-gradient(135deg, #4b00ff, #8e2de2);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(123, 0, 255, 0.7);
+}
+
+/* ======== CONTROLES DE MESES ======== */
+.controls {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.select {
+  padding: 0.6rem;
+  border-radius: 8px;
+  border: none;
+  background: rgba(0, 0, 0, 0.5);
+  color: #00ffe7;
+  backdrop-filter: blur(6px);
+  font-weight: bold;
+  transition: box-shadow 0.2s ease;
+}
+
+.select:hover,
+.select:focus {
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+  outline: none;
+}
+
+/* ======== GRAFICAS ======== */
+.graficasContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.grafica {
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 16px;
+  padding: 1rem;
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+}
+
+.grafica h2 {
+  text-align: center;
+  margin-bottom: 1rem;
+  text-shadow: 0 0 6px rgba(0, 255, 255, 0.6);
+}
+
+/* ======== REGISTROS ======== */
+.searchContainer {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.monthInput {
+  padding: 0.6rem;
+  border-radius: 8px;
+  border: none;
+  background: rgba(0, 0, 0, 0.5);
+  color: #00ffe7;
+  backdrop-filter: blur(6px);
+}
+
+.registrosContainer,
+.quitadosSection {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.registroCard {
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.15);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.registroCard:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
+}
+
+.registroHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.registroHeader h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.registroActions button {
+  margin-left: 0.5rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 6px;
+  background: rgba(75, 0, 255, 0.2);
+  border: 1px solid rgba(75, 0, 255, 0.4);
+  color: #00ffe7;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.registroActions button:hover {
+  background: rgba(75, 0, 255, 0.5);
+}
+
+.registroMetrics {
+  margin-top: 0.5rem;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.9rem;
+}
+
+/* ======== DETALLE MODAL - CORREGIDO Y MEJORADO ======== */
+.detalleContent {
+  color: #ffffff; /* Letras blancas por defecto */
+  background: rgba(0, 0, 0, 0.6); /* Fondo semitransparente oscuro */
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+}
+
+/* Textos dentro del modal */
+.detalleContent p,
+.detalleContent li {
+  color: #00ffe7; /* Cian neón consistente */
+  line-height: 1.6;
+}
+
+/* Títulos o subtítulos dentro del modal (opcional, si los usas) */
+.detalleContent h3,
+.detalleContent h4 {
+  color: #8e2de2; /* Púrpura vibrante */
+  text-shadow: 0 0 5px rgba(123, 0, 255, 0.7);
+  margin-bottom: 0.5rem;
+}
+
+/* Listas más visibles */
+.detalleContent ul {
+  padding-left: 1.5rem;
+  list-style: disc;
+}
+
+/* Links dentro del modal (por si acaso) */
+.detalleContent a {
+  color: #00ffe7;
+  text-decoration: underline;
+}
+
+.detalleContent a:hover {
+  color: #ffffff;
+}
+
+
+/** Responsive para pantallas grandes */
+.container {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.chartContainer {
+  height: 400px;
+  position: relative;
+  margin: 20px 0;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  padding: 15px;
+}
+
+.graficaWrapper {
+  margin: 30px 0;
+}
+
+.graficaWrapper h2 {
+  color: #2c3e50;
+  margin-bottom: 15px;
+  font-size: 1.4rem;
+}
+
+/* Resto de estilos... */

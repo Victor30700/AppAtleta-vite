@@ -7,6 +7,8 @@ import { GiFinishLine, GiNotebook, GiArchiveRegister, GiStopwatch, GiWeightLifti
 import backgroundImage from '../assets/pista5.jpg';
 import { BiBrain } from 'react-icons/bi';
 import { FaHeartbeat } from 'react-icons/fa';
+import { MdTrendingUp } from 'react-icons/md';
+
 import Navbar from '../components/NavBar';
 import StatusModal from '../components/StatusModal';
 
@@ -103,10 +105,12 @@ export default function Home() {
           <GiNotebook className="menu-icon" />
           <span>Registro Entreno</span>
         </div>
-        <div className="menu-card" onClick={() => navigateWithLoading('/lista')}>
-          <GiArchiveRegister className="menu-icon" />
-          <span>Lista Entrenos</span>
+
+        <div className="menu-card" onClick={() => navigateWithLoading('/grafica')}>
+          <MdTrendingUp className="menu-icon" />
+          <span>Rendimiento Deportivo</span>
         </div>
+        
         <div className="menu-card" onClick={() => navigateWithLoading('/controles')}>
           <GiStopwatch className="menu-icon" />
           <span>Controles PB</span>
