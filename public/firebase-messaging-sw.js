@@ -1,6 +1,8 @@
+// public/firebase-messaging-sw.js
 importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js');
 
+// Configuración estática o URL para obtener la configuración
 const firebaseConfig = {
   apiKey: self.__FIREBASE_CONFIG__.apiKey,
   authDomain: self.__FIREBASE_CONFIG__.authDomain,
@@ -10,6 +12,7 @@ const firebaseConfig = {
   appId: self.__FIREBASE_CONFIG__.appId,
   measurementId: self.__FIREBASE_CONFIG__.measurementId
 };
+
 
 const app = firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging(app);
@@ -43,6 +46,6 @@ self.addEventListener('notificationclick', (event) => {
       }
       
       return clients.openWindow(url);
-    })
-  );
+    })
+  );
 });
