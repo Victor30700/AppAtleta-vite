@@ -1,7 +1,21 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+// vite.config.js
+import { defineConfig } from 'vite';
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
-})
+  build: {
+    rollupOptions: {
+      plugins: [
+        {
+          name: 'replace-env-variables',
+          transform(code, id) {
+            if (id.includes('firebase-messaging-sw.js')) {
+              return code.replace(/'VITE_(.*?)'/g, (match, p1) => {
+                return JSON.stringify(process.env[`VITE_${p1}`] || match);
+              });
+            }
+          }
+        }
+      ]
+    }
+  }
+});

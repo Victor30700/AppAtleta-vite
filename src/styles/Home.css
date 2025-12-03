@@ -223,3 +223,34 @@
     filter: drop-shadow(0 0 12px #fff5b7);
   }
 }
+
+/* ===== VIDEO ANALYSIS CARD EXCLUSIVA ===== */
+.video-analysis-card {
+  grid-column: span 2; /* Ocupa las 2 columnas */
+  background: linear-gradient(135deg, #000428, #004e92);
+  border: 2px solid rgba(0, 255, 255, 0.3);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.video-analysis-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 0 30px rgba(0, 255, 255, 0.6);
+}
+
+/* ===== VIDEO ICON ANIMADA ===== */
+.video-icon-animated {
+  font-size: 3rem;
+  color: #00ffe7;
+  animation: cameraShake 2s infinite ease-in-out;
+  filter: drop-shadow(0 0 8px rgba(0, 255, 255, 0.7));
+}
+
+/* ===== ANIMACIÓN SHAKE / MOVIMIENTO ===== */
+@keyframes cameraShake {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  25% { transform: translate(2px, -2px) rotate(-2deg); }
+  50% { transform: translate(-2px, 2px) rotate(2deg); }
+  75% { transform: translate(2px, 2px) rotate(-2deg); }
+}

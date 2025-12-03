@@ -3,15 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { getAuth, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import '../styles/NavBar.css'; // Estilos separados
-
-import logo from '../assets/rayo-icon.png'; // Reemplaza con tu logo real
+import '../styles/NavBar.css';
+import logo from '../assets/rayo-icon.png';
 import { FiLogOut } from 'react-icons/fi';
 
 export default function Navbar() {
   const navigate = useNavigate();
   const [firstName, setFirstName] = useState('');
   const [Prueba, setPrueba] = useState('');
+  const [isScrolled, setIsScrolled] = useState(false);
   const auth = getAuth();
   const user = auth.currentUser;
 
@@ -27,9 +27,16 @@ export default function Navbar() {
         }
       }
     };
-
     fetchUser();
   }, [user]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 30);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -37,14 +44,12 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="navbar">
+    <nav className={`navbar ${isScrolled ? 'navbar-scrolled' : ''}`}>
       <div className="navbar-section" onClick={() => navigate('/home')}>
-      <div className="navbar-center"> SprinterApp</div>
+        <div className="navbar-center">SprinterApp</div>
         <img src={logo} alt="Logo" className="navbar-logo" />
       </div>
-      
       <div className="navbar-section navbar-right">
-      
         <span className="navbar-user" onClick={() => navigate('/editar-usuario')}>
           {firstName}
         </span>
@@ -52,7 +57,7 @@ export default function Navbar() {
           {Prueba}
         </span>
         <button className="navbar-logout" onClick={handleLogout}>
-        <FiLogOut className="logout-icon" />
+          <FiLogOut className="logout-icon" />
         </button>
       </div>
     </nav>
