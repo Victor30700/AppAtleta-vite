@@ -1,468 +1,427 @@
-import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../config/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-import { Bar, Line } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, PointElement, LineElement } from 'chart.js';
-import ConfirmModal from '../components/ConfirmModal';
-import styles from '../styles/GraficaRendimiento.module.css';
-import { CSVLink } from 'react-csv';
+import { 
+  ComposedChart, Line, Area, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine
+} from 'recharts';
+import { processAnalyticsData, getBestPBs } from '../utils/analyticsHelpers';
+import { FaArrowLeft, FaRunning, FaDumbbell, FaWeight, FaBed, FaTrophy, FaFileDownload, FaInfoCircle } from 'react-icons/fa';
 import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+import styles from '../styles/GraficaRendimiento.module.css';
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  PointElement,
-  LineElement
-);
-
-const DEFAULT_COMPARE_TEXT = 'Seleccionar mes';
-const CHART_CONFIG = {
-  maintainAspectRatio: false,
-  responsive: true,
-  plugins: {
-    legend: {
-      position: 'top',
-    },
-    title: {
-      display: true,
-      padding: 10
-    }
-  },
-  animation: {
-    duration: 400,
-    easing: 'easeInOutQuad'
+// Componente de Tooltip Personalizado para Recharts
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className={styles.customTooltip}>
+        <p className={styles.tooltipDate}>{label}</p>
+        {payload.map((entry, index) => (
+          <div key={index} style={{ color: entry.color }} className={styles.tooltipItem}>
+            <span>{entry.name}:</span>
+            <strong>{entry.value} {entry.unit}</strong>
+          </div>
+        ))}
+        {payload[0].payload.injury && (
+          <div className={styles.tooltipInjury}>
+            ⚠️ Lesión: {payload[0].payload.injury}
+          </div>
+        )}
+      </div>
+    );
   }
+  return null;
 };
 
 export default function GraficaRendimiento() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const [registros, setRegistros] = useState([]);
-  const [quitados, setQuitados] = useState(() => 
-    JSON.parse(localStorage.getItem('quitados') || '[]')
-  );
-  const [loadingRegs, setLoadingRegs] = useState(true);
-  const [selectedMonths, setSelectedMonths] = useState({ month1: DEFAULT_COMPARE_TEXT, month2: DEFAULT_COMPARE_TEXT });
-  const [searchMonth, setSearchMonth] = useState('');
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteIdx, setDeleteIdx] = useState(null);
-  const [viewInfo, setViewInfo] = useState(null);
-  const [activeTab, setActiveTab] = useState('analisis');
-  const chartRef1 = useRef(null);
-  const chartRef2 = useRef(null);
-  const [isMounted, setIsMounted] = useState(false);
+  
+  // Refs para captura de PDF
+  const kpiRef = useRef(null);
+  const mainChartRef = useRef(null);
+  const secondaryChartRef = useRef(null);
+  
+  const [rawData, setRawData] = useState(null);
+  const [timeRange, setTimeRange] = useState(3); 
+  const [selectedDistance, setSelectedDistance] = useState('100m');
+  const [chartData, setChartData] = useState([]);
+  const [pbs, setPbs] = useState({});
+  const [loadingData, setLoadingData] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
-  const docRegistro = user?.email && doc(db, 'registroEntreno', user.email);
-
-  // Carga segura de registros
-  const loadRegistros = useCallback(async () => {
-    if (!isMounted || !user) return;
-    
-    try {
-      const snap = await getDoc(docRegistro);
-      if (!isMounted) return;
-      
-      const data = snap.exists() ? snap.data().registros || [] : [];
-      data.sort((a, b) => b.fecha.localeCompare(a.fecha));
-      setRegistros(data);
-    } catch (error) {
-      console.error('Error cargando registros:', error);
-    } finally {
-      if (isMounted) setLoadingRegs(false);
-    }
-  }, [isMounted, user, docRegistro]);
-
+  // Carga de datos unificada
   useEffect(() => {
-    setIsMounted(true);
-    if (!loading && user) loadRegistros();
-    return () => setIsMounted(false);
-  }, [user, loading, loadRegistros]);
+    const fetchData = async () => {
+      if (!user) return;
+      try {
+        const [trackSnap, gymMonthSnap, gymDaySnap, healthSnap, pbSnap] = await Promise.all([
+          getDoc(doc(db, 'registroEntreno', user.email)),
+          getDoc(doc(db, 'registrosGym', user.email)),
+          getDoc(doc(db, 'registroGymDiario', user.email)),
+          getDoc(doc(db, 'healthProfiles', user.email)),
+          getDoc(doc(db, 'controlesPB', user.email))
+        ]);
 
-  // Persistencia optimizada
-  useEffect(() => {
-    if (isMounted) localStorage.setItem('quitados', JSON.stringify(quitados));
-  }, [quitados, isMounted]);
+        const trackData = trackSnap.exists() ? trackSnap.data().registros : [];
+        
+        const gymData = [
+           ...(gymMonthSnap.exists() ? gymMonthSnap.data().registros : []),
+           ...(gymDaySnap.exists() ? gymDaySnap.data().registros : [])
+        ];
+        const healthData = {
+           entries: healthSnap.exists() ? healthSnap.data().bodyEntries : [],
+           injuries: healthSnap.exists() ? healthSnap.data().injuries : []
+        };
+        const pbData = pbSnap.exists() ? pbSnap.data() : {};
 
-  // Generación de datos memoizada
-  const mesesDisponibles = useMemo(() => {
-    // 1. Extraer los primeros 7 caracteres (YYYY-MM) de cada fecha
-    const meses = registros.map(r => r.fecha.slice(0, 7));
-    // 2. Crear un Set para quedarnos con valores únicos
-    const unico = [...new Set(meses)];
-    // 3. Ordenar (ascendente), luego invertir (para descendente)
-    return unico.sort().reverse();
-  }, [registros]);
-
-  const getDataForMonth = useCallback((month) => {
-    const registrosMes = registros.filter(r => r.fecha.startsWith(month));
-    if (registrosMes.length === 0) return null;
-
-    const metricas = registrosMes.reduce((acc, r) => ({
-      estadoFisico: acc.estadoFisico + r.estadoFisico,
-      animo: acc.animo + r.animo,
-      sueño: acc.sueño + (r.sleepHours || 0),
-      tiempos: r.promedios?.reduce((tAcc, p) => {
-        const key = p.pruebaKey || p.distancia;
-        tAcc[key] = tAcc[key] ? { total: tAcc[key].total + p.promedio, count: tAcc[key].count + 1 } 
-                              : { total: p.promedio, count: 1 };
-        return tAcc;
-      }, acc.tiempos) || acc.tiempos
-    }), {
-      estadoFisico: 0,
-      animo: 0,
-      sueño: 0,
-      tiempos: {}
-    });
-
-    const count = registrosMes.length;
-    return {
-      estadoFisico: Number((metricas.estadoFisico / count).toFixed(2)),
-      animo: Number((metricas.animo / count).toFixed(2)),
-      sueño: Number((metricas.sueño / count).toFixed(1)),
-      tiempos: Object.fromEntries(
-        Object.entries(metricas.tiempos).map(([k, v]) => [k, Number((v.total / v.count).toFixed(2))])
-      )
-    };
-  }, [registros]);
-
-  // Generación de PDF profesional
-  const handleExportPDF = useCallback(async () => {
-    const doc = new jsPDF({
-      unit: 'mm',
-      format: 'a4',
-      hotfixes: ["px_scaling"]
-    });
-
-    const addChartToPDF = async (chartRef, title, yPos) => {
-      if (!chartRef.current) return;
-      
-      const canvas = chartRef.current.canvas;
-      const originalWidth = canvas.width;
-      const originalHeight = canvas.height;
-      
-      // Aumentar resolución
-      canvas.width = 1440;
-      canvas.height = 900;
-      chartRef.current.resize();
-      
-      const image = chartRef.current.toBase64Image('image/jpeg', 1.0);
-      const imgWidth = 180;
-      const imgHeight = (originalHeight * imgWidth) / originalWidth;
-      
-      doc.setFontSize(16);
-      doc.text(title, 15, yPos - 5);
-      doc.addImage(image, 'JPEG', 15, yPos, imgWidth, imgHeight);
-      
-      // Restaurar tamaño original
-      canvas.width = originalWidth;
-      canvas.height = originalHeight;
-      chartRef.current.resize();
-    };
-
-    await addChartToPDF(chartRef1, 'Comparativa Estado Físico/Ánimo', 20);
-    doc.addPage();
-    await addChartToPDF(chartRef2, 'Comparativa Tiempos', 20);
-    
-    doc.save(`rendimiento-${new Date().toISOString().slice(0,10)}.pdf`);
-  }, []);
-
-  // Datos CSV optimizados
-  const csvData = useMemo(() => 
-    registros.map(r => ({
-      Fecha: r.fecha,
-      Plan: r.plan || 'Sin plan',
-      'Estado Físico': r.estadoFisico,
-      Ánimo: r.animo,
-      'Horas Sueño': r.sleepHours || 'N/A',
-      'Series registradas': r.series?.map(s => 
-        `${s.distancia || s.pruebaKey}: ${s.porcentaje}% → ${s.sugerido}s`
-      ).join(' | ') || 'N/A',
-      'Tiempos promedio': r.promedios?.map(p => 
-        `${p.pruebaKey}: ${p.promedio}s`
-      ).join(' | ') || 'N/A'
-    })),
-    [registros]
-  );
-
-  // Generación de gráficas
-  const { month1, month2 } = selectedMonths;
-  const dataGraficas = useMemo(() => {
-    if (month1 === DEFAULT_COMPARE_TEXT) return null;
-    
-    const data1 = getDataForMonth(month1);
-    const data2 = month2 !== DEFAULT_COMPARE_TEXT ? getDataForMonth(month2) : null;
-
-    return {
-      estadoFisico: {
-        labels: ['Estado Físico', 'Ánimo', 'Horas Sueño'],
-        datasets: [
-          {
-            label: month1,
-            data: [data1.estadoFisico, data1.animo, data1.sueño],
-            backgroundColor: 'rgba(54, 162, 235, 0.8)',
-            borderWidth: 1
-          },
-          ...(data2 ? [{
-            label: month2,
-            data: [data2.estadoFisico, data2.animo, data2.sueño],
-            backgroundColor: 'rgba(255, 99, 132, 0.8)',
-            borderWidth: 1
-          }] : [])
-        ]
-      },
-      tiempos: {
-        labels: Object.keys(data1.tiempos),
-        datasets: [
-          {
-            label: `Tiempos ${month1}`,
-            data: Object.values(data1.tiempos),
-            borderColor: 'rgb(54, 162, 235)',
-            backgroundColor: 'rgba(54, 162, 235, 0.2)',
-            fill: true
-          },
-          ...(data2 ? [{
-            label: `Tiempos ${month2}`,
-            data: Object.values(data2.tiempos),
-            borderColor: 'rgb(255, 99, 132)',
-            backgroundColor: 'rgba(255, 99, 132, 0.2)',
-            fill: true
-          }] : [])
-        ]
+        setRawData({ trackData, gymData, healthData });
+        setPbs(getBestPBs(pbData));
+        
+      } catch (error) {
+        console.error("Error cargando analíticas:", error);
+      } finally {
+        setLoadingData(false);
       }
     };
-  }, [month1, month2, getDataForMonth]);
+    fetchData();
+  }, [user]);
 
-  if (loading || loadingRegs) return <div className={styles.loading}>Cargando...</div>;
-  if (!user) return <div className={styles.denied}>Acceso denegado</div>;
+  useEffect(() => {
+    if (rawData) {
+      const processed = processAnalyticsData(
+        rawData.trackData, 
+        rawData.gymData, 
+        rawData.healthData, 
+        pbs, 
+        timeRange
+      );
+      setChartData(processed);
+    }
+  }, [rawData, timeRange, pbs]);
+
+  const kpis = useMemo(() => {
+    if (!chartData.length) return {};
+    const sessions = chartData.filter(d => d.hasTrack || d.hasGym).length;
+    const avgSleep = (chartData.reduce((acc, curr) => acc + (curr.sleep || 0), 0) / (sessions || 1)).toFixed(1);
+    const lastWeight = chartData.slice().reverse().find(d => d.weight)?.weight || '--';
+    const bestTimeInPeriod = chartData
+        .map(d => d[selectedDistance])
+        .filter(t => t > 0)
+        .sort((a, b) => a - b)[0] || '--';
+
+    return { sessions, avgSleep, lastWeight, bestTimeInPeriod };
+  }, [chartData, selectedDistance]);
+
+  const aiExplanation = useMemo(() => {
+    if (!chartData.length) return "No hay suficientes datos para analizar.";
+    
+    const bestTime = kpis.bestTimeInPeriod;
+    const pb = pbs[selectedDistance] || '--';
+    const improvement = (bestTime !== '--' && pb !== '--') ? (parseFloat(bestTime) - parseFloat(pb)).toFixed(2) : null;
+    
+    let text = `En los últimos ${timeRange} meses, has realizado ${kpis.sessions} sesiones de entrenamiento. `;
+    
+    if (improvement !== null) {
+      if (improvement <= 0) text += `¡Excelente! Has igualado o superado tu PB en ${selectedDistance}. Tu consistencia está dando frutos. `;
+      else text += `Estás a ${improvement}s de tu mejor marca en ${selectedDistance}. Revisa tu descanso y peso corporal. `;
+    }
+    
+    if (parseFloat(kpis.avgSleep) < 7) text += "⚠️ Tu promedio de sueño es bajo (<7h), lo que puede estar limitando tu recuperación y velocidad máxima.";
+    else text += "✅ Tu descanso es adecuado, lo que favorece la adaptación muscular.";
+
+    return text;
+  }, [kpis, timeRange, selectedDistance, pbs]);
+
+  // --- FUNCIÓN DE EXPORTACIÓN PROFESIONAL ---
+  const handleExport = async () => {
+    setExporting(true);
+    const doc = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    // 1. Encabezado Corporativo
+    doc.setFillColor(15, 23, 42); // Azul oscuro
+    doc.rect(0, 0, pageWidth, 30, 'F');
+    doc.setTextColor(0, 255, 231); // Cian
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('INFORME DE RENDIMIENTO - SPRINTERAPP', pageWidth / 2, 18, { align: 'center' });
+    
+    let yPos = 40;
+
+    // Helper para capturar y añadir imagen
+    const addSectionToPDF = async (ref, title) => {
+        if(ref.current) {
+            // Fondo temporal para asegurar legibilidad en PDF (evita transparencia)
+            const originalBg = ref.current.style.backgroundColor;
+            ref.current.style.backgroundColor = '#0f172a'; 
+            
+            const canvas = await html2canvas(ref.current, { scale: 2, useCORS: true });
+            const imgData = canvas.toDataURL('image/png');
+            const imgProps = doc.getImageProperties(imgData);
+            const pdfWidth = pageWidth - 20;
+            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+            
+            if (yPos + pdfHeight > 280) {
+                doc.addPage();
+                yPos = 20;
+            }
+            
+            if(title) {
+                doc.setFontSize(14);
+                doc.setTextColor(50, 50, 50);
+                doc.text(title, 10, yPos);
+                yPos += 8;
+            }
+
+            doc.addImage(imgData, 'PNG', 10, yPos, pdfWidth, pdfHeight);
+            yPos += pdfHeight + 10;
+            
+            ref.current.style.backgroundColor = originalBg; // Restaurar
+        }
+    };
+
+    try {
+        // 2. Métricas Clave (KPIs)
+        await addSectionToPDF(kpiRef, "Resumen del Periodo");
+
+        // 3. Análisis de Texto (IA)
+        doc.setFillColor(240, 240, 240);
+        doc.rect(10, yPos, pageWidth - 20, 25, 'F');
+        doc.setFontSize(11);
+        doc.setTextColor(0, 0, 0);
+        doc.text("ANÁLISIS TÉCNICO:", 15, yPos + 8);
+        doc.setFont('helvetica', 'normal');
+        const splitText = doc.splitTextToSize(aiExplanation, pageWidth - 30);
+        doc.text(splitText, 15, yPos + 15);
+        yPos += 35;
+
+        // 4. Gráfica Principal
+        await addSectionToPDF(mainChartRef, `Evolución Velocidad ${selectedDistance} vs Peso`);
+
+        // 5. Gráficas Secundarias
+        await addSectionToPDF(secondaryChartRef, "Carga, Recuperación y Estado Físico");
+
+        // Pie de página
+        const pageCount = doc.internal.getNumberOfPages();
+        for(let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFontSize(8);
+            doc.setTextColor(150);
+            doc.text(`Generado el ${new Date().toLocaleDateString()} | Pág ${i} de ${pageCount}`, pageWidth / 2, 290, { align: 'center' });
+        }
+
+        doc.save(`Rendimiento_${selectedDistance}_${new Date().toISOString().slice(0,10)}.pdf`);
+    } catch (err) {
+        console.error("Error generando PDF", err);
+        alert("Error al generar el reporte. Intenta nuevamente.");
+    } finally {
+        setExporting(false);
+    }
+  };
+
+  if (loading || loadingData) return <div className={styles.loadingContainer}><div className={styles.spinner}></div></div>;
 
   return (
-    <div className={styles.container}>
+    <div className={styles.dashboardContainer}>
+      {/* HEADER */}
       <header className={styles.header}>
-        <button className={styles.backButton} onClick={() => navigate('/home')}>&larr; Volver</button>
-        <h1>Análisis de Rendimiento</h1>
-        <div className={styles.exportButtons}>
-          <CSVLink data={csvData} filename="rendimiento.csv" className={styles.button}>
-            Exportar CSV
-          </CSVLink>
-          <button onClick={handleExportPDF} className={styles.button}>
-            Exportar PDF
+        <div className={styles.headerLeft}>
+          <button className={styles.backBtn} onClick={() => navigate('/home')}>
+            <FaArrowLeft />
+          </button>
+          <h1>Centro de Rendimiento</h1>
+        </div>
+        
+        <div className={styles.controls}>
+          <select 
+            value={timeRange} 
+            onChange={(e) => setTimeRange(Number(e.target.value))}
+            className={styles.select}
+          >
+            <option value={1}>Último Mes</option>
+            <option value={3}>Últimos 3 Meses</option>
+            <option value={6}>Últimos 6 Meses</option>
+            <option value={12}>Año Completo</option>
+          </select>
+          
+          <button onClick={handleExport} className={styles.exportBtn} disabled={exporting}>
+            <FaFileDownload /> {exporting ? 'Generando...' : 'Reporte PDF'}
           </button>
         </div>
       </header>
 
-      <nav className={styles.tabs}>
-        <button 
-          className={`${styles.tab} ${activeTab === 'analisis' && styles.active}`}
-          onClick={() => setActiveTab('analisis')}
-        >
-          Análisis Comparativo
-        </button>
-        <button 
-          className={`${styles.tab} ${activeTab === 'registros' && styles.active}`}
-          onClick={() => setActiveTab('registros')}
-        >
-          Registros Completos
-        </button>
-      </nav>
-
-      {activeTab === 'analisis' ? (
-        <>
-          <div className={styles.controls}>
-            <select
-              value={selectedMonths.month1}
-              onChange={e => setSelectedMonths(prev => ({ ...prev, month1: e.target.value }))}
-              className={styles.select}
-            >
-              <option>{DEFAULT_COMPARE_TEXT}</option>
-              {mesesDisponibles.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
-
-            <select
-              value={selectedMonths.month2}
-              onChange={e => setSelectedMonths(prev => ({ ...prev, month2: e.target.value }))}
-              className={styles.select}
-              disabled={!mesesDisponibles.length}
-            >
-              <option>{DEFAULT_COMPARE_TEXT}</option>
-              {mesesDisponibles
-                .filter(m => m !== month1)
-                .map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
-          </div>
-
-          {month1 !== DEFAULT_COMPARE_TEXT && dataGraficas && (
-            <div className={styles.graficasContainer}>
-              <div className={styles.graficaWrapper}>
-                <h2>Estado Físico y Métricas</h2>
-                <div className={styles.chartContainer}>
-                  <Bar
-                    ref={chartRef1}
-                    data={dataGraficas.estadoFisico}
-                    options={{
-                      ...CHART_CONFIG,
-                      scales: {
-                        y: {
-                          beginAtZero: true,
-                          title: { display: true, text: 'Puntuación' }
-                        }
-                      }
-                    }}
-                    redraw={false}
-                  />
-                </div>
-              </div>
-
-              <div className={styles.graficaWrapper}>
-                <h2>Comparativa de Tiempos</h2>
-                <div className={styles.chartContainer}>
-                  <Line
-                    ref={chartRef2}
-                    data={dataGraficas.tiempos}
-                    options={{
-                      ...CHART_CONFIG,
-                      scales: {
-                        y: {
-                          beginAtZero: true,
-                          title: { display: true, text: 'Tiempo (segundos)' }
-                        }
-                      }
-                    }}
-                    redraw={false}
-                  />
-                </div>
-              </div>
+      {/* KPI CARDS (Ref para captura) */}
+      <div ref={kpiRef} className={styles.pdfSection}>
+        <div className={styles.kpiGrid}>
+            <div className={styles.kpiCard}>
+            <div className={styles.kpiIcon}><FaRunning /></div>
+            <div className={styles.kpiContent}>
+                <span className={styles.kpiLabel}>Sesiones (Periodo)</span>
+                <span className={styles.kpiValue}>{kpis.sessions}</span>
             </div>
-          )}
-        </>
-      ) : (
-        <>
-          <div className={styles.searchContainer}>
-            <input
-              type="month"
-              value={searchMonth}
-              onChange={e => setSearchMonth(e.target.value)}
-              className={styles.monthInput}
-              placeholder="Filtrar por mes"
-            />
-          </div>
-
-          <div className={styles.registrosContainer}>
-            {registros
-              .filter(r => searchMonth ? r.fecha.startsWith(searchMonth) : true)
-              .map((r, idx) => (
-                <article key={r.fecha} className={styles.registroCard}>
-                  <div className={styles.registroHeader}>
-                    <h3>{r.fecha} - {r.plan}</h3>
-                    <div className={styles.registroActions}>
-                      <button onClick={() => setViewInfo(r)}>Detalles</button>
-                      <button onClick={() => handleDelete(idx)}>Quitar</button>
-                    </div>
-                  </div>
-                  <div className={styles.registroMetrics}>
-                    <span title="Estado físico">🏋️ {r.estadoFisico}/10</span>
-                    <span title="Ánimo">😊 {r.animo}/5</span>
-                    <span title="Horas de sueño">💤 {r.sleepHours || 'N/A'}h</span>
-                  </div>
-                </article>
-              ))}
-          </div>
-
-          {quitados.length > 0 && (
-            <section className={styles.quitadosSection}>
-              <h3>Registros Quitados</h3>
-              {quitados.map((r, idx) => (
-                <article key={r.fecha} className={styles.registroCard}>
-                  <div className={styles.registroHeader}>
-                    <h3>{r.fecha} - {r.plan}</h3>
-                    <div className={styles.registroActions}>
-                      <button onClick={() => handleRestore(idx)}>Restaurar</button>
-                      <button onClick={() => setViewInfo(r)}>Detalles</button>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </section>
-          )}
-        </>
-      )}
-
-      <ConfirmModal
-        isOpen={showDeleteModal}
-        title="Confirmar Eliminación"
-        onConfirm={() => {
-          const quitado = registros[deleteIdx];
-          setQuitados(prev => [...prev, quitado]);
-          setRegistros(prev => prev.filter((_, i) => i !== deleteIdx));
-          setShowDeleteModal(false);
-        }}
-        onCancel={() => setShowDeleteModal(false)}
-        confirmText="Eliminar"
-      >
-        <p>¿Estás seguro que deseas quitar este registro del análisis?</p>
-      </ConfirmModal>
-
-      {viewInfo && (
-        <ConfirmModal
-          isOpen={true}
-          title={`Detalles del Registro - ${viewInfo.fecha}`}
-          onConfirm={() => setViewInfo(null)}
-          confirmText="Cerrar"
-          showCancel={false}
-        >
-          <div className={styles.detalleContent}>
-            <p><strong>Plan:</strong> {viewInfo.plan}</p>
-            <div className={styles.metricGrid}>
-              <div>
-                <h4>Estado Físico</h4>
-                <p>{viewInfo.estadoFisico}/10</p>
-              </div>
-              <div>
-                <h4>Ánimo</h4>
-                <p>{viewInfo.animo}/5</p>
-              </div>
-              <div>
-                <h4>Horas Sueño</h4>
-                <p>{viewInfo.sleepHours || 'N/A'}</p>
-              </div>
             </div>
+            <div className={styles.kpiCard}>
+            <div className={styles.kpiIcon} style={{color: '#ffd700'}}><FaTrophy /></div>
+            <div className={styles.kpiContent}>
+                <span className={styles.kpiLabel}>Mejor {selectedDistance} (Periodo)</span>
+                <span className={styles.kpiValue}>{kpis.bestTimeInPeriod}s</span>
+                <span className={styles.kpiSubLabel}>PB Histórico: {pbs[selectedDistance] || '--'}s</span>
+            </div>
+            </div>
+            <div className={styles.kpiCard}>
+            <div className={styles.kpiIcon} style={{color: '#4ade80'}}><FaWeight /></div>
+            <div className={styles.kpiContent}>
+                <span className={styles.kpiLabel}>Peso Actual</span>
+                <span className={styles.kpiValue}>{kpis.lastWeight} kg</span>
+            </div>
+            </div>
+            <div className={styles.kpiCard}>
+            <div className={styles.kpiIcon} style={{color: '#a78bfa'}}><FaBed /></div>
+            <div className={styles.kpiContent}>
+                <span className={styles.kpiLabel}>Promedio Sueño</span>
+                <span className={styles.kpiValue}>{kpis.avgSleep} h</span>
+            </div>
+            </div>
+        </div>
+      </div>
 
-            {viewInfo.series?.length > 0 && (
-              <>
-                <h4>Series Registradas</h4>
-                <ul className={styles.dataList}>
-                  {viewInfo.series.map((s, i) => (
-                    <li key={i}>
-                      <span>{s.distancia || s.pruebaKey}</span>
-                      <span>{s.porcentaje}%</span>
-                      <span>{s.sugerido}s</span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
+      {/* ANÁLISIS AUTOMÁTICO */}
+      <div className={styles.aiInsightBox}>
+        <div className={styles.aiHeader}>
+            <FaInfoCircle /> <span>Análisis de Progreso</span>
+        </div>
+        <p>{aiExplanation}</p>
+      </div>
 
-            {viewInfo.promedios?.length > 0 && (
-              <>
-                <h4>Tiempos Promedio</h4>
-                <ul className={styles.dataList}>
-                  {viewInfo.promedios.map((p, i) => (
-                    <li key={i}>
-                      <span>{p.pruebaKey}</span>
-                      <span>{p.promedio}s</span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
+      {/* GRÁFICA PRINCIPAL (Ref para captura) */}
+      <div ref={mainChartRef} className={`${styles.chartSection} ${styles.pdfSection}`}>
+        <div className={styles.chartHeader}>
+          <h3>🚀 Evolución de Velocidad & Peso</h3>
+          <div className={styles.chartControls}>
+             {pbs[selectedDistance] && <span className={styles.pbBadge}>PB: {pbs[selectedDistance]}s</span>}
+             <select 
+                value={selectedDistance} 
+                onChange={(e) => setSelectedDistance(e.target.value)}
+                className={styles.metricSelect}
+            >
+                <option value="30m">30m</option>
+                <option value="60m">60m</option>
+                <option value="80m">80m</option>
+                <option value="100m">100m</option>
+                <option value="120m">120m</option>
+                <option value="150m">150m</option>
+                <option value="200m">200m</option>
+                <option value="300m">300m</option>
+                <option value="400m">400m</option>
+            </select>
           </div>
-        </ConfirmModal>
-      )}
+        </div>
+        <div className={styles.chartWrapper}>
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={chartData} margin={{ top: 20, right: 20, bottom: 20, left: 0 }}>
+              <defs>
+                <linearGradient id="colorTime" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#00ffe7" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#00ffe7" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke="#334155" strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="displayDate" stroke="#94a3b8" tick={{fontSize: 12}} />
+              
+              {/* Eje Y Izquierdo (Tiempo) */}
+              <YAxis yAxisId="left" stroke="#00ffe7" reversed={true} domain={['dataMin - 0.5', 'dataMax + 0.5']} unit="s" width={40}/>
+              
+              {/* Eje Y Derecho (Peso) */}
+              <YAxis yAxisId="right" orientation="right" stroke="#4ade80" domain={['dataMin - 2', 'dataMax + 2']} unit="kg" width={40}/>
+              
+              <Tooltip content={<CustomTooltip />} />
+              <Legend />
+
+              <Area 
+                yAxisId="left"
+                type="monotone" 
+                dataKey={selectedDistance} 
+                name={`Tiempo ${selectedDistance}`} 
+                stroke="#00ffe7" 
+                fill="url(#colorTime)" 
+                strokeWidth={3}
+                connectNulls
+              />
+              <Line 
+                yAxisId="right"
+                type="monotone" 
+                dataKey="weight" 
+                name="Peso Corporal" 
+                stroke="#4ade80" 
+                strokeWidth={2} 
+                dot={{r: 3}}
+                connectNulls
+              />
+              
+              {/* Línea de Referencia PB */}
+              {pbs[selectedDistance] && (
+                <ReferenceLine yAxisId="left" y={pbs[selectedDistance]} label={{ value: 'PB Histórico', fill: '#ffd700', fontSize: 12 }} stroke="#ffd700" strokeDasharray="3 3" />
+              )}
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+        <div className={styles.chartFooterInfo}>
+           <p>Comparativa: Tiempos <strong>{selectedDistance}</strong> vs <strong>Peso Corporal</strong>. Línea amarilla: <strong>Récord Personal (PB)</strong>.</p>
+        </div>
+      </div>
+
+      {/* GRÁFICAS SECUNDARIAS (Ref para captura de todo el bloque) */}
+      <div ref={secondaryChartRef} className={`${styles.gridTwoColumns} ${styles.pdfSection}`}>
+        <div className={styles.chartSection}>
+          <div className={styles.chartHeader}>
+            <h3>📊 Carga vs. Recuperación</h3>
+          </div>
+          <div className={styles.chartWrapperSmall}>
+            <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={chartData}>
+                    <CartesianGrid stroke="#334155" vertical={false} />
+                    <XAxis dataKey="displayDate" stroke="#94a3b8" fontSize={10} />
+                    <YAxis yAxisId="left" stroke="#a78bfa" hide />
+                    <YAxis yAxisId="right" orientation="right" stroke="#f472b6" domain={[0, 12]} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend />
+                    
+                    <Bar yAxisId="left" dataKey="trackVolume" name="Volumen Pista" fill="#a78bfa" barSize={15} radius={[4,4,0,0]} />
+                    <Line yAxisId="right" type="monotone" dataKey="sleep" name="Sueño (h)" stroke="#f472b6" strokeWidth={2} connectNulls dot={false} />
+                </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+           <p className={styles.miniChartExplanation}>Volumen (barras) vs Horas de sueño (línea). Vigilar picos de carga con poco sueño.</p>
+        </div>
+
+        <div className={styles.chartSection}>
+            <div className={styles.chartHeader}>
+                <h3>🧠 Estado Físico & Ánimo</h3>
+            </div>
+            <div className={styles.chartWrapperSmall}>
+                <ResponsiveContainer width="100%" height="100%">
+                    <LineChartComponent data={chartData} />
+                </ResponsiveContainer>
+            </div>
+             <p className={styles.miniChartExplanation}>Percepción física (azul) y estado de ánimo (amarillo). Deben mantenerse estables o subir.</p>
+        </div>
+      </div>
     </div>
   );
 }
+
+// Componente auxiliar simple para la segunda gráfica pequeña
+const LineChartComponent = ({ data }) => (
+    <ComposedChart data={data}>
+        <CartesianGrid stroke="#334155" vertical={false} />
+        <XAxis dataKey="displayDate" stroke="#94a3b8" fontSize={10} />
+        <YAxis domain={[0, 10]} stroke="#94a3b8" width={30}/>
+        <Tooltip content={<CustomTooltip />} />
+        <Legend />
+        <Line type="monotone" dataKey="physique" name="Físico" stroke="#38bdf8" strokeWidth={2} connectNulls dot={false} />
+        <Line type="monotone" dataKey="mood" name="Ánimo" stroke="#fbbf24" strokeWidth={2} connectNulls dot={false} />
+    </ComposedChart>
+);
