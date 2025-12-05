@@ -4,10 +4,10 @@ import { db } from '../config/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { 
-  ComposedChart, Line, Area, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine
+  ComposedChart, Line, Area, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, AreaChart, ReferenceDot
 } from 'recharts';
 import { processAnalyticsData, getBestPBs } from '../utils/analyticsHelpers';
-import { FaArrowLeft, FaRunning, FaDumbbell, FaWeight, FaBed, FaTrophy, FaFileDownload, FaInfoCircle } from 'react-icons/fa';
+import { FaArrowLeft, FaRunning, FaDumbbell, FaWeight, FaBed, FaTrophy, FaFileDownload, FaInfoCircle, FaHistory, FaBroom } from 'react-icons/fa';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import styles from '../styles/GraficaRendimiento.module.css';
@@ -15,6 +15,9 @@ import styles from '../styles/GraficaRendimiento.module.css';
 // Componente de Tooltip Personalizado para Recharts
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
+    // Buscar el payload que contenga la información de la lesión
+    const injuryPayload = payload.find(p => p.payload.injury);
+    
     return (
       <div className={styles.customTooltip}>
         <p className={styles.tooltipDate}>{label}</p>
@@ -24,10 +27,16 @@ const CustomTooltip = ({ active, payload, label }) => {
             <strong>{entry.value} {entry.unit}</strong>
           </div>
         ))}
-        {payload[0].payload.injury && (
+        {/* Mostrar lesión si está disponible en la data de esa fecha */}
+        {injuryPayload && (
           <div className={styles.tooltipInjury}>
-            ⚠️ Lesión: {payload[0].payload.injury}
+            ⚠️ Lesión: {injuryPayload.payload.injury}
           </div>
+        )}
+        {payload[0].payload.sensaciones && (
+           <div style={{marginTop: '5px', fontSize: '0.8rem', color: '#cbd5e1', fontStyle: 'italic'}}>
+             "{payload[0].payload.sensaciones}"
+           </div>
         )}
       </div>
     );
@@ -41,14 +50,20 @@ export default function GraficaRendimiento() {
   
   // Refs para captura de PDF
   const kpiRef = useRef(null);
+  const pbChartRef = useRef(null);
   const mainChartRef = useRef(null);
   const secondaryChartRef = useRef(null);
+  const sleepChartRef = useRef(null); // Nueva referencia para gráfica de sueño
   
   const [rawData, setRawData] = useState(null);
   const [timeRange, setTimeRange] = useState(3); 
   const [selectedDistance, setSelectedDistance] = useState('100m');
   const [chartData, setChartData] = useState([]);
+  
+  // Estados para PBs
   const [pbs, setPbs] = useState({});
+  const [fullPbHistory, setFullPbHistory] = useState({}); 
+
   const [loadingData, setLoadingData] = useState(true);
   const [exporting, setExporting] = useState(false);
 
@@ -67,18 +82,23 @@ export default function GraficaRendimiento() {
 
         const trackData = trackSnap.exists() ? trackSnap.data().registros : [];
         
-        const gymData = [
+        const gymDataFull = [
            ...(gymMonthSnap.exists() ? gymMonthSnap.data().registros : []),
            ...(gymDaySnap.exists() ? gymDaySnap.data().registros : [])
         ];
+        
         const healthData = {
            entries: healthSnap.exists() ? healthSnap.data().bodyEntries : [],
            injuries: healthSnap.exists() ? healthSnap.data().injuries : []
         };
-        const pbData = pbSnap.exists() ? pbSnap.data() : {};
+        
+        const pbDataRaw = pbSnap.exists() ? pbSnap.data() : {};
 
-        setRawData({ trackData, gymData, healthData });
-        setPbs(getBestPBs(pbData));
+        setRawData({ trackData, gymData: gymDataFull, healthData });
+        
+        // Procesar PBs
+        setPbs(getBestPBs(pbDataRaw));
+        setFullPbHistory(pbDataRaw); 
         
       } catch (error) {
         console.error("Error cargando analíticas:", error);
@@ -102,6 +122,27 @@ export default function GraficaRendimiento() {
     }
   }, [rawData, timeRange, pbs]);
 
+  // --- LÓGICA GRÁFICA PB ---
+  const pbEvolutionData = useMemo(() => {
+    if (!fullPbHistory || !selectedDistance) return [];
+    
+    const history = fullPbHistory[selectedDistance] || [];
+    const sorted = [...history].sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+    
+    return sorted.map(item => ({
+        date: item.fecha,
+        valor: parseFloat(item.valor),
+        unit: item.unidad,
+        sensaciones: item.sensaciones
+    }));
+  }, [fullPbHistory, selectedDistance]);
+
+  const isTimeMetric = useMemo(() => {
+    if (pbEvolutionData.length > 0) return pbEvolutionData[0].unit === 's';
+    return ['m', 'km'].every(u => !selectedDistance.endsWith(u)) || selectedDistance.includes('100m') || selectedDistance.includes('400m');
+  }, [pbEvolutionData, selectedDistance]);
+
+  // Cálculo de KPIs
   const kpis = useMemo(() => {
     if (!chartData.length) return {};
     const sessions = chartData.filter(d => d.hasTrack || d.hasGym).length;
@@ -141,20 +182,17 @@ export default function GraficaRendimiento() {
     const doc = new jsPDF('p', 'mm', 'a4');
     const pageWidth = doc.internal.pageSize.getWidth();
     
-    // 1. Encabezado Corporativo
-    doc.setFillColor(15, 23, 42); // Azul oscuro
+    doc.setFillColor(15, 23, 42); 
     doc.rect(0, 0, pageWidth, 30, 'F');
-    doc.setTextColor(0, 255, 231); // Cian
+    doc.setTextColor(0, 255, 231); 
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
     doc.text('INFORME DE RENDIMIENTO - SPRINTERAPP', pageWidth / 2, 18, { align: 'center' });
     
     let yPos = 40;
 
-    // Helper para capturar y añadir imagen
     const addSectionToPDF = async (ref, title) => {
         if(ref.current) {
-            // Fondo temporal para asegurar legibilidad en PDF (evita transparencia)
             const originalBg = ref.current.style.backgroundColor;
             ref.current.style.backgroundColor = '#0f172a'; 
             
@@ -179,15 +217,13 @@ export default function GraficaRendimiento() {
             doc.addImage(imgData, 'PNG', 10, yPos, pdfWidth, pdfHeight);
             yPos += pdfHeight + 10;
             
-            ref.current.style.backgroundColor = originalBg; // Restaurar
+            ref.current.style.backgroundColor = originalBg; 
         }
     };
 
     try {
-        // 2. Métricas Clave (KPIs)
         await addSectionToPDF(kpiRef, "Resumen del Periodo");
 
-        // 3. Análisis de Texto (IA)
         doc.setFillColor(240, 240, 240);
         doc.rect(10, yPos, pageWidth - 20, 25, 'F');
         doc.setFontSize(11);
@@ -198,13 +234,16 @@ export default function GraficaRendimiento() {
         doc.text(splitText, 15, yPos + 15);
         yPos += 35;
 
-        // 4. Gráfica Principal
-        await addSectionToPDF(mainChartRef, `Evolución Velocidad ${selectedDistance} vs Peso`);
+        if (pbEvolutionData.length > 1) {
+            await addSectionToPDF(pbChartRef, `Historial de PB: ${selectedDistance}`);
+        }
 
-        // 5. Gráficas Secundarias
-        await addSectionToPDF(secondaryChartRef, "Carga, Recuperación y Estado Físico");
+        await addSectionToPDF(mainChartRef, `Evolución Peso Corporal`);
+        
+        // Agregar las gráficas secundarias
+        await addSectionToPDF(secondaryChartRef, "Detalle Peso y Lesiones");
+        await addSectionToPDF(sleepChartRef, "Historial de Sueño"); // Nueva exportación
 
-        // Pie de página
         const pageCount = doc.internal.getNumberOfPages();
         for(let i = 1; i <= pageCount; i++) {
             doc.setPage(i);
@@ -216,7 +255,7 @@ export default function GraficaRendimiento() {
         doc.save(`Rendimiento_${selectedDistance}_${new Date().toISOString().slice(0,10)}.pdf`);
     } catch (err) {
         console.error("Error generando PDF", err);
-        alert("Error al generar el reporte. Intenta nuevamente.");
+        alert("Error al generar el reporte.");
     } finally {
         setExporting(false);
     }
@@ -253,13 +292,13 @@ export default function GraficaRendimiento() {
         </div>
       </header>
 
-      {/* KPI CARDS (Ref para captura) */}
+      {/* KPI CARDS */}
       <div ref={kpiRef} className={styles.pdfSection}>
         <div className={styles.kpiGrid}>
             <div className={styles.kpiCard}>
             <div className={styles.kpiIcon}><FaRunning /></div>
             <div className={styles.kpiContent}>
-                <span className={styles.kpiLabel}>Sesiones (Periodo)</span>
+                <span className={styles.kpiLabel}>Sesiones</span>
                 <span className={styles.kpiValue}>{kpis.sessions}</span>
             </div>
             </div>
@@ -296,132 +335,280 @@ export default function GraficaRendimiento() {
         <p>{aiExplanation}</p>
       </div>
 
-      {/* GRÁFICA PRINCIPAL (Ref para captura) */}
+      {/* GRÁFICA DE RÉCORDS (PB) */}
+      {pbEvolutionData.length > 0 ? (
+        <div ref={pbChartRef} className={`${styles.chartSection} ${styles.pdfSection}`} style={{border: '1px solid rgba(255, 215, 0, 0.3)'}}>
+            <div className={styles.chartHeader}>
+                <h3 style={{color: '#ffd700'}}>
+                    <FaHistory style={{marginRight: '8px'}} />
+                    Trayectoria Histórica
+                </h3>
+                <div className={styles.chartControls}>
+                    <span className={styles.pbBadge} style={{background: 'rgba(255, 215, 0, 0.1)', color: '#ffd700'}}>
+                        Récords: {pbEvolutionData.length}
+                    </span>
+                    <select 
+                        value={selectedDistance} 
+                        onChange={(e) => setSelectedDistance(e.target.value)}
+                        className={styles.metricSelect}
+                        style={{ borderColor: '#ffd700', color: '#ffd700' }}
+                    >
+                        <option value="30m">30m</option>
+                        <option value="60m">60m</option>
+                        <option value="80m">80m</option>
+                        <option value="100m">100m</option>
+                        <option value="120m">120m</option>
+                        <option value="150m">150m</option>
+                        <option value="200m">200m</option>
+                        <option value="300m">300m</option>
+                        <option value="400m">400m</option>
+                        <option value="800m">800m</option>
+                        <option value="1500m">1500m</option>
+                        <option value="longJump">Salto Longitud</option>
+                        <option value="tripleJump">Salto Triple</option>
+                    </select>
+                </div>
+            </div>
+            <div className={styles.chartWrapper}>
+                <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={pbEvolutionData} margin={{ top: 20, right: 20, bottom: 20, left: 0 }}>
+                        <defs>
+                            <linearGradient id="colorPb" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#ffd700" stopOpacity={0.3}/>
+                                <stop offset="95%" stopColor="#ffd700" stopOpacity={0}/>
+                            </linearGradient>
+                        </defs>
+                        <CartesianGrid stroke="#334155" strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="date" stroke="#94a3b8" tick={{fontSize: 12}} />
+                        
+                        {/* Eje Y Invertido si es tiempo, Normal si es distancia */}
+                        <YAxis 
+                            stroke="#ffd700" 
+                            reversed={isTimeMetric} 
+                            domain={['dataMin - 0.2', 'dataMax + 0.2']} 
+                            unit={pbEvolutionData[0]?.unit || 's'} 
+                            width={40} 
+                        />
+                        
+                        <Tooltip content={<CustomTooltip />} />
+                        <Legend />
+
+                        <Area 
+                            type="stepAfter" 
+                            dataKey="valor" 
+                            name={`Récord ${selectedDistance}`} 
+                            stroke="#ffd700" 
+                            fill="url(#colorPb)" 
+                            strokeWidth={3}
+                            dot={{r: 5, fill: '#ffd700', strokeWidth: 2, stroke: '#000'}}
+                            activeDot={{ r: 8 }}
+                        />
+                    </AreaChart>
+                </ResponsiveContainer>
+            </div>
+            <div className={styles.chartFooterInfo}>
+                <p style={{color: '#ffd700'}}>Gráfica de progresión de registros desde <strong>ControlesPB</strong>. Cada punto es un control oficial registrado.</p>
+            </div>
+        </div>
+      ) : (
+        <div className={styles.chartSection} style={{textAlign:'center', color: '#64748b'}}>
+             <div className={styles.chartHeader} style={{ justifyContent: 'center', flexDirection: 'column', gap: '10px' }}>
+                <h3>No hay datos para {selectedDistance}</h3>
+                <select 
+                        value={selectedDistance} 
+                        onChange={(e) => setSelectedDistance(e.target.value)}
+                        className={styles.metricSelect}
+                        style={{ borderColor: '#64748b', color: '#64748b' }}
+                    >
+                        <option value="30m">30m</option>
+                        <option value="60m">60m</option>
+                        <option value="80m">80m</option>
+                        <option value="100m">100m</option>
+                        <option value="120m">120m</option>
+                        <option value="150m">150m</option>
+                        <option value="200m">200m</option>
+                        <option value="300m">300m</option>
+                        <option value="400m">400m</option>
+                        <option value="800m">800m</option>
+                        <option value="1500m">1500m</option>
+                        <option value="longJump">Salto Longitud</option>
+                        <option value="tripleJump">Salto Triple</option>
+                </select>
+            </div>
+            <p>Regístralos en la sección "Controles PB" para ver tu evolución aquí.</p>
+        </div>
+      )}
+
+      {/* GRÁFICA PRINCIPAL (SOLO PESO CORPORAL) */}
       <div ref={mainChartRef} className={`${styles.chartSection} ${styles.pdfSection}`}>
         <div className={styles.chartHeader}>
-          <h3>🚀 Evolución de Velocidad & Peso</h3>
-          <div className={styles.chartControls}>
-             {pbs[selectedDistance] && <span className={styles.pbBadge}>PB: {pbs[selectedDistance]}s</span>}
-             <select 
-                value={selectedDistance} 
-                onChange={(e) => setSelectedDistance(e.target.value)}
-                className={styles.metricSelect}
-            >
-                <option value="30m">30m</option>
-                <option value="60m">60m</option>
-                <option value="80m">80m</option>
-                <option value="100m">100m</option>
-                <option value="120m">120m</option>
-                <option value="150m">150m</option>
-                <option value="200m">200m</option>
-                <option value="300m">300m</option>
-                <option value="400m">400m</option>
-            </select>
-          </div>
+          <h3>⚖️ Evolución de Peso Corporal</h3>
         </div>
         <div className={styles.chartWrapper}>
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top: 20, right: 20, bottom: 20, left: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 20, right: 20, bottom: 20, left: 0 }}>
               <defs>
-                <linearGradient id="colorTime" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#00ffe7" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#00ffe7" stopOpacity={0}/>
+                <linearGradient id="colorWeightMain" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#4ade80" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#4ade80" stopOpacity={0}/>
                 </linearGradient>
               </defs>
               <CartesianGrid stroke="#334155" strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="displayDate" stroke="#94a3b8" tick={{fontSize: 12}} />
               
-              {/* Eje Y Izquierdo (Tiempo) */}
-              <YAxis yAxisId="left" stroke="#00ffe7" reversed={true} domain={['dataMin - 0.5', 'dataMax + 0.5']} unit="s" width={40}/>
-              
-              {/* Eje Y Derecho (Peso) */}
-              <YAxis yAxisId="right" orientation="right" stroke="#4ade80" domain={['dataMin - 2', 'dataMax + 2']} unit="kg" width={40}/>
+              <YAxis 
+                stroke="#4ade80" 
+                domain={['dataMin - 1', 'dataMax + 1']} 
+                unit="kg" 
+                width={40}
+              />
               
               <Tooltip content={<CustomTooltip />} />
               <Legend />
 
               <Area 
-                yAxisId="left"
-                type="monotone" 
-                dataKey={selectedDistance} 
-                name={`Tiempo ${selectedDistance}`} 
-                stroke="#00ffe7" 
-                fill="url(#colorTime)" 
-                strokeWidth={3}
-                connectNulls
-              />
-              <Line 
-                yAxisId="right"
                 type="monotone" 
                 dataKey="weight" 
                 name="Peso Corporal" 
                 stroke="#4ade80" 
-                strokeWidth={2} 
-                dot={{r: 3}}
+                fill="url(#colorWeightMain)" 
+                strokeWidth={3} 
+                dot={{r: 4, fill: '#4ade80', strokeWidth: 2, stroke: '#0f172a'}}
+                activeDot={{ r: 6 }}
                 connectNulls
               />
-              
-              {/* Línea de Referencia PB */}
-              {pbs[selectedDistance] && (
-                <ReferenceLine yAxisId="left" y={pbs[selectedDistance]} label={{ value: 'PB Histórico', fill: '#ffd700', fontSize: 12 }} stroke="#ffd700" strokeDasharray="3 3" />
-              )}
-            </ComposedChart>
+            </AreaChart>
           </ResponsiveContainer>
         </div>
         <div className={styles.chartFooterInfo}>
-           <p>Comparativa: Tiempos <strong>{selectedDistance}</strong> vs <strong>Peso Corporal</strong>. Línea amarilla: <strong>Récord Personal (PB)</strong>.</p>
+           <p>Registro de la evolución del peso corporal en el periodo seleccionado.</p>
         </div>
       </div>
 
-      {/* GRÁFICAS SECUNDARIAS (Ref para captura de todo el bloque) */}
-      <div ref={secondaryChartRef} className={`${styles.gridTwoColumns} ${styles.pdfSection}`}>
-        <div className={styles.chartSection}>
+      {/* GRÁFICAS SECUNDARIAS */}
+      <div className={styles.gridTwoColumns}>
+        
+        {/* GRÁFICA DE PESO CORPORAL Y LESIONES */}
+        <div ref={secondaryChartRef} className={`${styles.chartSection} ${styles.pdfSection}`}>
           <div className={styles.chartHeader}>
-            <h3>📊 Carga vs. Recuperación</h3>
+            <h3>⚠️ Relación Peso y Lesiones</h3>
+            <FaBroom color="#94a3b8" title="Gráfica detallada"/>
           </div>
           <div className={styles.chartWrapperSmall}>
             <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={chartData}>
-                    <CartesianGrid stroke="#334155" vertical={false} />
+                <ComposedChart data={chartData} margin={{ top: 10, right: 10, bottom: 0, left: -10 }}>
+                    <CartesianGrid stroke="#334155" vertical={false} strokeDasharray="3 3" />
                     <XAxis dataKey="displayDate" stroke="#94a3b8" fontSize={10} />
-                    <YAxis yAxisId="left" stroke="#a78bfa" hide />
-                    <YAxis yAxisId="right" orientation="right" stroke="#f472b6" domain={[0, 12]} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend />
                     
-                    <Bar yAxisId="left" dataKey="trackVolume" name="Volumen Pista" fill="#a78bfa" barSize={15} radius={[4,4,0,0]} />
-                    <Line yAxisId="right" type="monotone" dataKey="sleep" name="Sueño (h)" stroke="#f472b6" strokeWidth={2} connectNulls dot={false} />
+                    <YAxis 
+                        orientation="right" 
+                        stroke="#4ade80" 
+                        domain={['dataMin - 2', 'dataMax + 2']} 
+                        unit="kg" 
+                        width={35}
+                        tick={{fontSize: 10}}
+                    />
+                    
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend wrapperStyle={{fontSize: '10px'}} />
+                    
+                    <Line 
+                        type="monotone" 
+                        dataKey="weight" 
+                        name="Peso (kg)" 
+                        stroke="#4ade80" 
+                        strokeWidth={2} 
+                        dot={false}
+                        connectNulls
+                    />
+
+                    {/* Puntos de Referencia para Lesiones */}
+                    {chartData
+                        .filter(d => d.injury)
+                        .map((dataPoint, index) => (
+                        <ReferenceDot 
+                            key={`injury-${index}`}
+                            x={dataPoint.displayDate}
+                            y={dataPoint.weight || dataPoint.prevWeight || 'dataMin'}
+                            r={5}
+                            fill="#f87171" 
+                            stroke="#dc2626"
+                            strokeWidth={1}
+                            isFront
+                        >
+                            <g>
+                                <text x={0} y={0} dy={-8} fill="#f87171" textAnchor="middle" fontSize={12}>⚠️</text>
+                            </g>
+                        </ReferenceDot>
+                    ))}
                 </ComposedChart>
             </ResponsiveContainer>
           </div>
-           <p className={styles.miniChartExplanation}>Volumen (barras) vs Horas de sueño (línea). Vigilar picos de carga con poco sueño.</p>
+           <p className={styles.miniChartExplanation}>Alertas de lesión (⚠️) sobre la curva de peso.</p>
         </div>
-
+        
+        {/* GRÁFICA DE ÁNIMO (ESTADO FÍSICO & ÁNIMO) - CORREGIDA PARA RENDERIZARSE CORRECTAMENTE */}
         <div className={styles.chartSection}>
             <div className={styles.chartHeader}>
                 <h3>🧠 Estado Físico & Ánimo</h3>
             </div>
             <div className={styles.chartWrapperSmall}>
+                {/* Aquí se define el gráfico inline para asegurar que ResponsiveContainer funcione */}
                 <ResponsiveContainer width="100%" height="100%">
-                    <LineChartComponent data={chartData} />
+                    <ComposedChart data={chartData} margin={{ top: 10, right: 10, bottom: 0, left: -10 }}>
+                        <CartesianGrid stroke="#334155" vertical={false} strokeDasharray="3 3" />
+                        <XAxis dataKey="displayDate" stroke="#94a3b8" fontSize={10} />
+                        <YAxis domain={[0, 10]} stroke="#94a3b8" width={30} tick={{fontSize: 10}} />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Legend wrapperStyle={{fontSize: '10px'}} />
+                        <Line type="monotone" dataKey="physique" name="Físico (0-10)" stroke="#38bdf8" strokeWidth={2} connectNulls dot={false} />
+                        <Line type="monotone" dataKey="mood" name="Ánimo (0-10)" stroke="#fbbf24" strokeWidth={2} connectNulls dot={false} />
+                    </ComposedChart>
                 </ResponsiveContainer>
             </div>
-             <p className={styles.miniChartExplanation}>Percepción física (azul) y estado de ánimo (amarillo). Deben mantenerse estables o subir.</p>
+             <p className={styles.miniChartExplanation}>Tendencia de percepción subjetiva.</p>
         </div>
+
+        {/* --- NUEVA GRÁFICA: HORAS DE SUEÑO --- */}
+        <div ref={sleepChartRef} className={`${styles.chartSection} ${styles.pdfSection}`} style={{gridColumn: '1 / -1'}}>
+          <div className={styles.chartHeader}>
+            <h3>😴 Historial de Sueño</h3>
+            <span className={styles.pbBadge} style={{background: '#a78bfa22', color: '#a78bfa'}}>
+                Promedio: {kpis.avgSleep}h
+            </span>
+          </div>
+          <div className={styles.chartWrapperSmall} style={{height: '200px'}}>
+            <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={chartData} margin={{ top: 10, right: 10, bottom: 0, left: -10 }}>
+                    <CartesianGrid stroke="#334155" vertical={false} strokeDasharray="3 3" />
+                    <XAxis dataKey="displayDate" stroke="#94a3b8" fontSize={10} />
+                    <YAxis 
+                        stroke="#a78bfa" 
+                        domain={[0, 12]} 
+                        unit="h" 
+                        width={30}
+                        tick={{fontSize: 10}}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend wrapperStyle={{fontSize: '10px'}} />
+                    
+                    {/* Línea de referencia de 8 horas */}
+                    <ReferenceLine y={8} stroke="#10b981" strokeDasharray="3 3" label={{ value: 'Meta (8h)', fill: '#10b981', fontSize: 10, position: 'insideBottomRight' }} />
+
+                    <Bar 
+                        dataKey="sleep" 
+                        name="Horas de Sueño" 
+                        fill="#a78bfa" 
+                        barSize={20} 
+                        radius={[4,4,0,0]} 
+                    />
+                </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+          <p className={styles.miniChartExplanation}>Registro diario de horas de descanso.</p>
+        </div>
+
       </div>
     </div>
   );
 }
-
-// Componente auxiliar simple para la segunda gráfica pequeña
-const LineChartComponent = ({ data }) => (
-    <ComposedChart data={data}>
-        <CartesianGrid stroke="#334155" vertical={false} />
-        <XAxis dataKey="displayDate" stroke="#94a3b8" fontSize={10} />
-        <YAxis domain={[0, 10]} stroke="#94a3b8" width={30}/>
-        <Tooltip content={<CustomTooltip />} />
-        <Legend />
-        <Line type="monotone" dataKey="physique" name="Físico" stroke="#38bdf8" strokeWidth={2} connectNulls dot={false} />
-        <Line type="monotone" dataKey="mood" name="Ánimo" stroke="#fbbf24" strokeWidth={2} connectNulls dot={false} />
-    </ComposedChart>
-);
