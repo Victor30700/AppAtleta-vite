@@ -22,12 +22,12 @@ export default function ChatGPTPage() {
     {
       role: 'assistant',
       content: `### 🚀 Sistema Coach Nova Iniciado
-Hola atleta. He cargado tu expediente completo: **tiempos**, **cargas de gimnasio** y **estado físico**.
+Hola atleta. He cargado tu expediente completo con **tiempos detallados**, **clima** y **cargas de gimnasio**.
 
 ¿En qué nos enfocamos hoy?
-* 📊 Analizar el rendimiento de la última sesión.
+* 📊 Analizar el rendimiento técnico de tu última sesión (fatiga, consistencia).
 * 🥗 Planificar nutrición pre/post entreno.
-* 🧠 Estrategia para la próxima competencia.`
+* 🧠 Estrategia competitiva basada en tus marcas.`
     }
   ]);
   const [input, setInput] = useState('');
@@ -45,16 +45,17 @@ Hola atleta. He cargado tu expediente completo: **tiempos**, **cargas de gimnasi
         const userSnap = await getDoc(doc(db, 'users', user.uid));
         const userData = userSnap.exists() ? userSnap.data() : null;
 
-        // 2. Pista (Ordenado por fecha)
+        // 2. Pista (Ordenado por fecha: Antiguo -> Nuevo)
         const trackSnap = await getDoc(doc(db, 'registroEntreno', user.email));
         const trackData = trackSnap.exists() ? trackSnap.data().registros : [];
         trackData.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
 
-        // 3. Gym (Unificado y ordenado)
+        // 3. Gym (Ordenado por fecha: Nuevo -> Antiguo para el slice en context builder)
         const gymMensualSnap = await getDoc(doc(db, 'registrosGym', user.email));
         const gymDiarioSnap = await getDoc(doc(db, 'registroGymDiario', user.email));
         let gymData = [];
         if (gymDiarioSnap.exists()) gymData = [...gymData, ...gymDiarioSnap.data().registros];
+        // Aquí ordenamos descendente para que [0] sea el más reciente en el builder
         gymData.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
         // 4. PBs
@@ -79,18 +80,35 @@ Hola atleta. He cargado tu expediente completo: **tiempos**, **cargas de gimnasi
         const contextString = buildAthleteContext(userData, trackData, gymData, pbData, healthData);
         
         const systemPrompt = `
-          Actúa como Coach Nova, un entrenador de alto rendimiento especializado en atletismo, biomecánica y nutrición deportiva.
+          Actúa como **Coach Nova**, un entrenador de alto rendimiento especializado en atletismo (velocidad y potencia).
+          
+          TIENES ACCESO A LOS DATOS CRUDOS DE CADA SERIE. NO SOLO PROMEDIOS.
           
           EXPEDIENTE DEL ATLETA:
           ${contextString}
 
-          DIRECTRICES DE RESPUESTA:
-          1. **Análisis Basado en Datos:** Si preguntan por rendimiento, compara el último entreno con los PBs. Usa porcentajes (ej: "Estás al 92% de tu máximo").
-          2. **Nutrición Específica:**
-             - Entrenos de Potencia/Fuerza: Recomienda Proteína (20-25g) + Carbos Rápidos post-entreno.
-             - Entrenos Lácticos/Resistencia: Prioriza reposición de glucógeno y antioxidantes.
-          3. **Tono Profesional:** Directo, técnico pero motivador. Usa formato Markdown (negritas, listas) para facilitar la lectura rápida.
-          4. **Seguridad:** Si detectas fatiga alta (estado físico < 6) o sueño bajo (< 6h), sugiere reducir la carga o descanso activo.
+          ### INSTRUCCIONES DE ANÁLISIS PROFUNDO:
+          
+          1. **ANÁLISIS DE TIEMPOS (LO MÁS IMPORTANTE):**
+             - Cuando el atleta pregunte por su sesión, mira el array "Series" (ej: [7.47, 7.12, 7.22, 7.09]).
+             - **Identifica el Mejor Tiempo (SB del día)**: Compara este valor específico con su PB histórico.
+             - **Calcula la Fatiga Intra-sesión**: Diferencia entre el peor y mejor tiempo. Si hay mucha varianza, coméntalo.
+             - **Consistencia**: Si los tiempos son muy estables (ej: todos en 7.2x), elogia la consistencia.
+
+          2. **CONTEXTO AMBIENTAL Y EQUIPO:**
+             - **Viento**: Si el viento es > +2.0 m/s, advierte que los tiempos no son homologables. Si es negativo (en contra), valora el esfuerzo extra.
+             - **Calzado**: Si usa CLAVOS (Spikes), los tiempos deben ser rápidos. Si usa Zapatillas, sé tolerante (0.5s - 1s más lento es normal).
+
+          3. **ESTADO FÍSICO Y RECUPERACIÓN:**
+             - Cruza el rendimiento con el sueño y el estado físico reportado. (Ej: "Rendiste bien a pesar de dormir solo 5h, cuidado con el sistema nervioso").
+
+          4. **FORMATO DE RESPUESTA:**
+             - Sé directo, técnico y motivador.
+             - Usa Markdown: **Negritas** para datos clave, Listas para puntos.
+             - Estructura: 
+               - 📊 **Diagnóstico** (Comparativa PB vs Mejor tiempo de hoy).
+               - 🔬 **Análisis Técnico** (Desglose de la serie, influencia del viento/calzado).
+               - 🧠 **Conclusión y Consejos** (Basado en la fatiga y estado físico).
         `;
 
         setSystemContext(systemPrompt);

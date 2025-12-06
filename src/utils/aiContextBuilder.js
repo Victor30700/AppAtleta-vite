@@ -40,7 +40,7 @@ export const buildAthleteContext = (profile, trainings, gym, pbs, health) => {
 
   // --- CONSTRUCCIÓN DEL CONTEXTO (PROMPT) ---
 
-  let context = `ROL: Eres Coach Nova, un entrenador olímpico de élite. Tu análisis se basa estrictamente en los datos biomecánicos y de rendimiento del atleta.\n\n`;
+  let context = `ROL: Eres Coach Nova, un entrenador olímpico de élite. Tu análisis se basa estrictamente en los datos biomecánicos, tiempos reales y contexto del atleta. NO inventes datos.\n\n`;
   
   context += `📋 REPORTE DE ESTADO ACTUAL (${todayStr})\n`;
   
@@ -84,7 +84,10 @@ export const buildAthleteContext = (profile, trainings, gym, pbs, health) => {
   context += `\n📊 ANÁLISIS DE CARGA RECIENTE (Últimos 30 días):\n`;
   context += `- Volumen: ${totalSessions} sesiones totales (Pista + Gym).\n`;
   
-  context += `\n🏃 ÚLTIMAS SESIONES DE PISTA:\n`;
+  // 5. Entrenamientos Pista (DETALLADO)
+  // IMPORTANTE: Tomamos los últimos 5 entrenamientos para dar contexto inmediato
+  context += `\n🏃 ÚLTIMAS SESIONES DE PISTA (Orden Cronológico):\n`;
+  
   trainings.slice(-5).forEach(t => {
     // Detectar enfoque
     let enfoque = "Técnica/Rodaje";
@@ -92,24 +95,44 @@ export const buildAthleteContext = (profile, trainings, gym, pbs, health) => {
     else if (t.series?.some(s => (s.distancia || s.pruebaKey || '').match(/150m|200m|300m/))) enfoque = "Resistencia a la Velocidad";
     else if (t.series?.some(s => (s.distancia || s.pruebaKey || '').match(/400m|500m|600m/))) enfoque = "Tolerancia al Lactato";
     
-    context += `  📅 ${t.fecha} [${enfoque}]\n`;
-    context += `     Subjetivo: Físico ${t.estadoFisico}/10 | Ánimo ${t.animo}/5\n`;
+    // Datos Ambientales y Equipo
+    const vientoStr = t.clima?.wind ? `${t.clima.wind}m/s` : 'N/D';
+    const tempStr = t.clima?.temp ? `${t.clima.temp}°C` : 'N/D';
+    const calzadoStr = t.calzado ? t.calzado.toUpperCase() : 'N/D';
+
+    context += `\n📅 FECHA: ${t.fecha} [${enfoque}]\n`;
+    context += `   CONTEXTO: Viento: ${vientoStr} | Temp: ${tempStr} | Calzado: ${calzadoStr}\n`;
+    context += `   PLAN: "${t.plan || 'Sin descripción'}"\n`;
+    context += `   ESTADO: Físico ${t.estadoFisico}/10 | Ánimo ${t.animo}/5\n`;
+    context += `   TIEMPOS REALES (SERIES):\n`;
     
     if (t.promedios && t.promedios.length > 0) {
-      const tiempos = t.promedios.map(p => `${p.pruebaKey}: ${p.promedio}s`).join(', ');
-      context += `     Registros: ${tiempos}\n`;
+      t.promedios.forEach((bloque, idx) => {
+        // AQUÍ ESTÁ LA CLAVE: Extraemos el array completo de tiempos
+        const tiemposRaw = bloque.series ? `[${bloque.series.filter(val => val).join(', ')}]` : '[]';
+        context += `     📍 ${bloque.pruebaKey} (Bloque ${idx + 1}): Series=${tiemposRaw} | Promedio=${bloque.promedio}s\n`;
+      });
+    } else {
+        context += `     (Sin tiempos registrados)\n`;
     }
   });
 
-  // 5. Gym
+  // 6. Gym (Últimas sesiones)
   if (gym.length > 0) {
-    const lastGym = gym[0];
-    context += `\n🏋️ ÚLTIMO GYM (${lastGym.fecha}):\n`;
-    context += `   Enfoque: ${lastGym.zona || 'General'}\n`;
-    if(lastGym.ejercicios) {
-        const ejercicios = lastGym.ejercicios.slice(0, 3).map(e => `${e.nombre} (${e.pesos?.slice(-1)[0]}kg)`).join(', ');
-        context += `   Cargas Top: ${ejercicios}\n`;
-    }
+    // Tomamos los primeros 3 (asumiendo que en ChatGPTPage vienen ordenados del más reciente al más antiguo)
+    const lastGymSessions = gym.slice(0, 3);
+    
+    context += `\n🏋️ ÚLTIMAS SESIONES DE GYM:\n`;
+    lastGymSessions.forEach(g => {
+        context += `   📅 ${g.fecha} (${g.zona || 'General'}): ${g.plan || ''}\n`;
+        if(g.ejercicios && Array.isArray(g.ejercicios)) {
+            const ejercicios = g.ejercicios.slice(0, 5).map(e => {
+                const maxWeight = e.pesos ? Math.max(...e.pesos.map(p => Number(p) || 0)) : 0;
+                return `${e.nombre}: ${maxWeight}${g.unidadPeso || 'kg'}`;
+            }).join(' | ');
+            context += `      Cargas: ${ejercicios}\n`;
+        }
+    });
   }
 
   return context;
