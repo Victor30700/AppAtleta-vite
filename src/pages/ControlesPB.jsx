@@ -169,12 +169,18 @@ export default function ControlesPB() {
 
   return (
     <div className="controles-container">
-      <button className="back-button" onClick={()=>navigate('/home')}><FiArrowLeft/> Volver</button>
+      {/* Nuevo HEADER FIJO (Implementación Solicitada) */}
+      <div className="controles-header-full">
+        <button className="back-button-full" onClick={()=>navigate('/home')}>
+          <FiArrowLeft/> Volver
+        </button>
+      </div>
+      <br></br>
       <h2 className="controles-title">Controles PB</h2>
 
-      {/* Buscador */}
+      {/* Buscador (Implementación Solicitada con clase 'search-icon') */}
       <div className="search-box">
-        <FiSearch/>
+        <FiSearch className="search-icon"/>
         <input
           type="text"
           placeholder="Buscar prueba..."

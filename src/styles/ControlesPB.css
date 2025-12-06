@@ -21,44 +21,104 @@
   overflow-x: hidden; /* vertical overflow visible para el calendario */
 }
 
-/* Botón Volver con ícono animado, fijo en esquina superior izquierda */
-.back-button {
-  position: fixed;
-  top: 16px;
-  left: 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: rgba(0, 0, 0, 0.6);
-  border: none;
-  border-radius: 8px;
-  color: #00ff9d;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: background 0.3s ease, transform 0.2s ease;
-  z-index: 3000;
-}
-.back-button:hover {
-  background: rgba(0, 0, 0, 0.8);
-  transform: translateX(-4px);
-}
-
 /* Asegura que el calendario de DatePicker se muestre siempre encima */
 .react-datepicker-popper,
 .react-datepicker {
   z-index: 3000 !important;
 }
 
-/* Título principal */
-.controles-title {
-  margin-top: 64px; /* deja espacio para el botón Volver */
-  font-size: 1.8rem;
+/* =========================================
+   HEADER FIJO (BOTÓN VOLVER FULL)
+   ========================================= */
+.controles-header-full {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 100;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  box-shadow: 0 2px 15px rgba(0,0,0,0.5);
+}
+
+.back-button-full {
+  background: transparent;
+  border: none;
+  color: #00ffe7;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
   font-weight: 700;
+  cursor: pointer;
+  padding: 8px;
+  transition: all 0.2s ease;
+}
+
+.back-button-full:hover {
+  color: #fff;
+  transform: translateX(-2px);
+}
+
+.back-button-full svg {
+  font-size: 1.2rem;
+}
+
+/* Título Principal */
+.controles-title {
+  margin-top: 20px;
+  font-size: 1.8rem;
+  font-weight: 800;
   text-transform: uppercase;
   margin-bottom: 24px;
-  text-shadow: 2px 2px 8px rgba(0,0,0,0.7);
+  text-shadow: 0 0 10px rgba(0, 255, 231, 0.5);
   text-align: center;
+  letter-spacing: 1px;
+}
+
+/* =========================================
+   BUSCADOR (CORREGIDO: Lupa y Texto)
+   ========================================= */
+.search-box {
+  position: relative;
+  width: 100%;
+  max-width: 450px;
+  margin-bottom: 30px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #00ffe7;
+  font-size: 1.2rem;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.search-box input {
+  width: 100%;
+  /* Padding-left para que el texto empiece DESPUÉS de la lupa */
+  padding: 14px 14px 14px 45px;
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 1rem;
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+.search-box input:focus {
+  border-color: #00ffe7;
+  box-shadow: 0 0 0 3px rgba(0, 255, 231, 0.15);
+  background: rgba(30, 41, 59, 0.95);
 }
 
 /* Formulario de controles: fondo transparente con blur */
@@ -126,7 +186,7 @@
 /* Efecto pulso suave */
 @keyframes pulse {
   0%, 100% { box-shadow: 0 4px 16px rgba(0,255,157,0.4); }
-  50%     { box-shadow: 0 6px 20px rgba(0,255,157,0.6); }
+  50%      { box-shadow: 0 6px 20px rgba(0,255,157,0.6); }
 }
 
 /* Lista de registros */

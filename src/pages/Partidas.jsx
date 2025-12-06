@@ -4,6 +4,9 @@ import audio1 from '../assets/audio1.mp3';
 import audio2 from '../assets/audio2.mp3';
 import audio3 from '../assets/audio3.mp3';
 import '../styles/Partidas.css';
+// Nuevos iconos para mejorar la UI
+import { FaArrowLeft, FaStopwatch, FaVolumeUp, FaRunning, FaFlagCheckered } from 'react-icons/fa';
+import { GiPistolGun } from 'react-icons/gi';
 
 export default function Partidas() {
   const navigate = useNavigate();
@@ -19,8 +22,9 @@ export default function Partidas() {
   const audioRef3 = useRef(null);
   const timeouts = useRef([]);
 
+  // --- LOGICA ORIGINAL INTACTA ---
   const iniciarSecuencia = () => {
-    if (secuenciaActiva) return; // prevenir múltiples inicios
+    if (secuenciaActiva) return;
     setSecuenciaActiva(true);
     setEstado('Preparando...');
 
@@ -93,49 +97,84 @@ export default function Partidas() {
     }
   };
 
+  // Helper para determinar la clase CSS según el estado (para efectos visuales)
+  const getStatusClass = () => {
+    switch (estado) {
+      case 'A sus marcas...': return 'status-marks'; // Rojo/Preparado
+      case 'Listo...': return 'status-set'; // Amarillo/Tensión
+      case '¡YA!': return 'status-go'; // Verde/Flash
+      case 'Secuencia finalizada': return 'status-finished';
+      case 'Preparando...': return 'status-loading';
+      default: return 'status-idle';
+    }
+  };
+
   return (
     <div className="partida-background">
-      <div className="partida-container">
-        <button className="btn-home" onClick={() => navigate('/')}>
-          ⬅ Volver al Inicio
-        </button>
-
-        <h2>Simulación de Partida 100m</h2>
-
-        <div className="form-group">
-          <label>Tiempo antes de "A sus marcas" (segundos):</label>
-          <input type="number" value={tiempo1} min="0" step="0.1" onChange={e => setTiempo1(parseFloat(e.target.value))} />
+      <div className={`partida-container ${getStatusClass()}`}>
+        
+        {/* Header simple */}
+        <div className="partida-header">
+          <button className="btn-icon-back" onClick={() => navigate('/')}>
+            <FaArrowLeft />
+          </button>
+          <h2>Simulador de Salida</h2>
         </div>
 
-        <div className="form-group">
-          <label>Tiempo entre "A sus marcas" y "Listo":</label>
-          <input type="number" value={tiempo2} min="0" step="0.1" onChange={e => setTiempo2(parseFloat(e.target.value))} />
+        {/* VISUALIZADOR PRINCIPAL (SEMÁFORO) */}
+        <div className="status-display-container">
+          <div className={`status-light ${getStatusClass()}`}>
+            <div className="light-icon">
+              {estado === '¡YA!' ? <GiPistolGun /> : 
+               estado === 'Listo...' ? <FaRunning /> : 
+               estado === 'A sus marcas...' ? <FaFlagCheckered /> : 
+               <FaStopwatch />}
+            </div>
+          </div>
+          <h1 className="status-text">{estado}</h1>
         </div>
 
-        <div className="form-group">
-          <label>Tiempo entre "Listo" y Pistola:</label>
-          <input type="number" value={tiempo3} min="0" step="0.1" onChange={e => setTiempo3(parseFloat(e.target.value))} />
+        {/* PANEL DE CONFIGURACIÓN (Solo visible si no está activa la secuencia o si quieres verlo siempre, lo deshabilitamos visualmente cuando corre) */}
+        <div className={`config-panel ${secuenciaActiva ? 'disabled-panel' : ''}`}>
+          
+          <div className="inputs-row">
+            <div className="input-group">
+              <label>Marcas (s)</label>
+              <input type="number" value={tiempo1} min="0" step="0.1" onChange={e => setTiempo1(parseFloat(e.target.value))} />
+            </div>
+            <div className="input-group">
+              <label>Listos (s)</label>
+              <input type="number" value={tiempo2} min="0" step="0.1" onChange={e => setTiempo2(parseFloat(e.target.value))} />
+            </div>
+            <div className="input-group">
+              <label>Disparo (s)</label>
+              <input type="number" value={tiempo3} min="0" step="0.1" onChange={e => setTiempo3(parseFloat(e.target.value))} />
+            </div>
+          </div>
+
+          <div className="audio-upload-group">
+            <label className="file-upload-label">
+              <FaVolumeUp /> 
+              <span>{customPistola ? "Sonido personalizado cargado" : "Cambiar sonido de pistola"}</span>
+              <input type="file" accept="audio/*" onChange={handleAudioUpload} className="hidden-file-input" />
+            </label>
+          </div>
         </div>
 
-        <div className="form-group">
-          <label>Reemplazar sonido de la pistola:</label>
-          <input type="file" accept="audio/*" onChange={handleAudioUpload} />
+        {/* BOTONES DE ACCIÓN */}
+        <div className="action-buttons">
+          {!secuenciaActiva ? (
+            <button className="btn-main start" onClick={iniciarSecuencia}>
+              INICIAR SALIDA
+            </button>
+          ) : (
+            <button className="btn-main cancel" onClick={cancelarSecuencia}>
+              DETENER / SALIDA FALSA
+            </button>
+          )}
         </div>
 
-        <div className="btn-group">
-  <button className="btn-start" onClick={iniciarSecuencia} disabled={secuenciaActiva}>
-    Iniciar Secuencia
-  </button>
-
-  {secuenciaActiva && (
-    <button className="btn-cancel" onClick={cancelarSecuencia}>
-      Cancelar
-    </button>
-  )}
-</div>
-
-        <h3>Estado: {estado}</h3>
-
+        {/* Audios Ocultos */}
         <audio ref={audioRef1} src={audio1} />
         <audio ref={audioRef2} src={audio2} />
         <audio ref={audioRef3} src={audio3} />
