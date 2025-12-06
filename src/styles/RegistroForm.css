@@ -798,3 +798,53 @@ input[type=range]::-webkit-slider-runnable-track {
   background: rgba(255,255,255,0.2);
   border-radius: 2px;
 }
+
+/* =========================================
+   FIX: ESTILOS DEL MODAL (ConfirmModal)
+   ========================================= */
+/* Forzamos estilos oscuros para que coincida con el tema y se lea el texto */
+.modal-content {
+  background-color: #1e293b !important; /* Fondo oscuro */
+  border: 1px solid var(--primary-color) !important; /* Borde neón */
+  color: #fff !important; /* Texto blanco */
+  box-shadow: 0 0 25px rgba(0, 255, 231, 0.2) !important;
+}
+
+.modal-footer {
+    margin-top: 1.5rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+}
+
+/* Botones del modal */
+.modal-footer .btn {
+    padding: 0.7rem 1.5rem;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+}
+
+/* Botón Cancelar (Gris) */
+.modal-footer .btn.cancel {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #cbd5e1; /* Texto gris claro visible */
+}
+.modal-footer .btn.cancel:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: #fff;
+}
+
+/* Botón Confirmar (Verde/Primary) */
+.modal-footer .btn.confirm {
+    background: linear-gradient(135deg, var(--success-color), #059669);
+    color: #fff; /* Texto blanco visible */
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+}
+.modal-footer .btn.confirm:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.6);
+}

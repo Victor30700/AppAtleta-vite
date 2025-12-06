@@ -108,9 +108,16 @@ export const buildAthleteContext = (profile, trainings, gym, pbs, health) => {
     
     if (t.promedios && t.promedios.length > 0) {
       t.promedios.forEach((bloque, idx) => {
-        // AQUÍ ESTÁ LA CLAVE: Extraemos el array completo de tiempos
+        // Extraemos tiempos
         const tiemposRaw = bloque.series ? `[${bloque.series.filter(val => val).join(', ')}]` : '[]';
-        context += `     📍 ${bloque.pruebaKey} (Bloque ${idx + 1}): Series=${tiemposRaw} | Promedio=${bloque.promedio}s\n`;
+        
+        // [MEJORA CLAVE] Agregar información de PAUSAS al contexto de la IA
+        let infoPausa = `Pausa: ${bloque.pausa || '?'}min`;
+        if (bloque.macro && bloque.macro.at && bloque.macro.time) {
+            infoPausa += ` | MACRO PAUSA de ${bloque.macro.time}min tras la repetición #${bloque.macro.at}`;
+        }
+
+        context += `     📍 ${bloque.pruebaKey} (Bloque ${idx + 1}): Series=${tiemposRaw} | Promedio=${bloque.promedio}s | ${infoPausa}\n`;
       });
     } else {
         context += `     (Sin tiempos registrados)\n`;
