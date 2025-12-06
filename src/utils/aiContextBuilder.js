@@ -154,15 +154,25 @@ export const buildAthleteContext = (profile, trainings, gym, pbs, health, videos
       context += `      📝 Descripción del atleta: "${v.description}"\n`;
       context += `      ℹ️ Estado: ${estado} | ID: ${v.id}\n`;
       
-      // Si el backend genera métricas clave en el futuro, se añadirán aquí
-      if (v.metricsSummary || v.aiSummary) { 
-         const summary = v.metricsSummary ? JSON.stringify(v.metricsSummary) : v.aiSummary;
-         context += `      🤖 Datos Biomecánicos: ${summary}\n`;
+      // LÓGICA CORREGIDA: Mostrar TODO lo que el backend genere
+      if (v.status === 'completed') {
+          // 1. Mostrar resumen narrativo si existe
+          if (v.aiSummary) {
+             context += `      🤖 DIAGNÓSTICO IA: ${v.aiSummary}\n`;
+          }
+          // 2. Mostrar métricas técnicas si existen (Ángulos, etc.)
+          if (v.metricsSummary) {
+             // Convertimos el objeto de métricas en un string legible
+             const metricsStr = Object.entries(v.metricsSummary)
+                .map(([key, val]) => `${key}: ${val}`)
+                .join(' | ');
+             context += `      📐 DATOS TÉCNICOS: { ${metricsStr} }\n`;
+          }
       }
       context += `      -----------------------------------\n`;
     });
     
-    context += `\n   INSTRUCCIÓN DE VIDEO: Si el atleta pregunta por su técnica, cruza la información de sus "Sensaciones" en el entrenamiento de pista con la "Descripción" de sus videos recientes. Si el video está procesado, sugiere revisar la herramienta de análisis.\n`;
+    context += `\n   INSTRUCCIÓN DE VIDEO: Si el atleta pregunta por su técnica, utiliza tanto el "DIAGNÓSTICO IA" como los "DATOS TÉCNICOS" (ej: ángulos del tronco) para dar una respuesta precisa. Cruza esto con sus sensaciones en la pista.\n`;
   } else {
     context += `\n🎥 VIDEOS: No hay videos subidos recientemente para análisis.\n`;
   }

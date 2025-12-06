@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Copy, Send, Trash2, Download, Bot, User, ArrowLeft, Loader2 } from 'lucide-react';
 import { sendMessageToGPT } from '../config/openai';
 import { useAuth } from '../context/AuthContext';
-import { getFirestore, doc, getDoc, collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
+// IMPORTS ACTUALIZADOS: Agregamos onSnapshot para tiempo real
+import { getFirestore, doc, getDoc, collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { app } from '../config/firebase';
 import { useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
@@ -22,21 +23,26 @@ export default function ChatGPTPage() {
     {
       role: 'assistant',
       content: `### 🚀 Sistema Coach Nova Iniciado
-Hola atleta. He cargado tu expediente completo con **tiempos detallados**, **clima**, **cargas de gimnasio** y **análisis de video**.
+Hola atleta. He conectado con tu base de datos de alto rendimiento.
 
-¿En qué nos enfocamos hoy?
-* 📊 Analizar el rendimiento técnico de tu última sesión (fatiga, consistencia).
-* 📹 Revisión biomecánica de tus videos recientes.
-* 🧠 Estrategia competitiva basada en tus marcas.`
+Tengo acceso en tiempo real a:
+* 📹 **Análisis Biomecánico** de tus videos.
+* ⏱️ **Tiempos de Pista** y fatiga.
+* 🏋️ **Cargas de Gimnasio**.
+
+¿Analizamos tu técnica de carrera o planificamos la semana?`
     }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
 
-  // --- CARGA DE DATOS MASIVA ---
+  // Almacén para datos estáticos (Perfil, Pista, Gym, etc. que no cambian segundo a segundo)
+  const [staticData, setStaticData] = useState(null);
+
+  // --- 1. CARGA DE DATOS ESTÁTICOS (Una sola vez) ---
   useEffect(() => {
-    const loadAllData = async () => {
+    const fetchStaticData = async () => {
       if (!user) return;
       try {
         setLoadingData(true);
@@ -50,12 +56,11 @@ Hola atleta. He cargado tu expediente completo con **tiempos detallados**, **cli
         const trackData = trackSnap.exists() ? trackSnap.data().registros : [];
         trackData.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
 
-        // 3. Gym (Ordenado por fecha: Nuevo -> Antiguo para el slice en context builder)
+        // 3. Gym
         const gymMensualSnap = await getDoc(doc(db, 'registrosGym', user.email));
         const gymDiarioSnap = await getDoc(doc(db, 'registroGymDiario', user.email));
         let gymData = [];
         if (gymDiarioSnap.exists()) gymData = [...gymData, ...gymDiarioSnap.data().registros];
-        // Aquí ordenamos descendente para que [0] sea el más reciente en el builder
         gymData.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
         // 4. PBs
@@ -76,69 +81,91 @@ Hola atleta. He cargado tu expediente completo con **tiempos detallados**, **cli
         };
         healthData.entries.sort((a,b) => new Date(b.date) - new Date(a.date));
 
-        // 6. Videos (NUEVO: Cargar los últimos 5 videos)
-        const videosRef = collection(db, 'userVideos', user.uid, 'videos');
-        const videoQuery = query(videosRef, orderBy('createdAt', 'desc'), limit(5));
-        const videoSnap = await getDocs(videoQuery);
-        
-        const videoData = videoSnap.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          // Convertimos el timestamp de Firestore a Date JS para el builder
-          createdAt: doc.data().createdAt?.toDate() || new Date()
-        }));
-
-        // Construir contexto inteligente pasando videoData
-        const contextString = buildAthleteContext(userData, trackData, gymData, pbData, healthData, videoData);
-        
-        const systemPrompt = `
-          Actúa como **Coach Nova**, un entrenador de alto rendimiento especializado en atletismo (velocidad y potencia).
-          
-          TIENES ACCESO A LOS DATOS CRUDOS DE CADA SERIE Y A LOS ANÁLISIS DE VIDEO.
-          
-          EXPEDIENTE DEL ATLETA:
-          ${contextString}
-
-          ### INSTRUCCIONES DE ANÁLISIS PROFUNDO:
-          
-          1. **ANÁLISIS DE TIEMPOS (LO MÁS IMPORTANTE):**
-             - Cuando el atleta pregunte por su sesión, mira el array "Series" (ej: [7.47, 7.12, 7.22, 7.09]).
-             - **Identifica el Mejor Tiempo (SB del día)**: Compara este valor específico con su PB histórico.
-             - **Calcula la Fatiga Intra-sesión**: Diferencia entre el peor y mejor tiempo. Si hay mucha varianza, coméntalo.
-             - **Consistencia**: Si los tiempos son muy estables (ej: todos en 7.2x), elogia la consistencia.
-
-          2. **INTEGRACIÓN DE VIDEO Y BIOMECÁNICA:**
-             - Tienes acceso a los metadatos de los videos recientes en la sección "BIBLIOTECA DE ANÁLISIS DE VIDEO".
-             - Si el atleta menciona "mira mi video" o pregunta por técnica, revisa la descripción y título de los videos recientes.
-             - Si el estado es "✅ Procesado" (completed), sugiere revisar la pestaña "Análisis de Video" para ver ángulos y trayectorias.
-             - Relaciona la "Descripción" del video (ej: "partida estática") con los tiempos de pista de fechas cercanas.
-
-          3. **CONTEXTO AMBIENTAL Y EQUIPO:**
-             - **Viento**: Si el viento es > +2.0 m/s, advierte que los tiempos no son homologables. Si es negativo, valora el esfuerzo.
-             - **Calzado**: Si usa CLAVOS (Spikes), exige tiempos rápidos. Si usa Zapatillas, sé tolerante.
-
-          4. **ESTADO FÍSICO Y RECUPERACIÓN:**
-             - Cruza el rendimiento con el sueño y el estado físico reportado.
-
-          5. **FORMATO DE RESPUESTA:**
-             - Sé directo, técnico y motivador.
-             - Usa Markdown: **Negritas** para datos clave, Listas para puntos.
-             - Estructura: 
-               - 📊 **Diagnóstico** (Comparativa PB vs Mejor tiempo de hoy).
-               - 🔬 **Análisis Técnico/Video** (Si aplica).
-               - 🧠 **Conclusión y Consejos**.
-        `;
-
-        setSystemContext(systemPrompt);
+        // Guardamos todo en el estado para usarlo cuando lleguen los videos en tiempo real
+        setStaticData({ userData, trackData, gymData, pbData, healthData });
 
       } catch (error) {
-        console.error("Error cargando datos:", error);
-      } finally {
-        setLoadingData(false);
+        console.error("Error cargando datos estáticos:", error);
       }
     };
-    loadAllData();
+    fetchStaticData();
   }, [user, db]);
+
+  // --- 2. LISTENER EN TIEMPO REAL PARA VIDEOS ---
+  // Este efecto se activa cuando ya tenemos los staticData y escucha cambios en Firestore
+  useEffect(() => {
+    if (!user || !staticData) return;
+
+    const videosRef = collection(db, 'userVideos', user.uid, 'videos');
+    // Traemos los últimos 5 para contexto reciente
+    const q = query(videosRef, orderBy('createdAt', 'desc'), limit(5));
+
+    // onSnapshot: Escucha activa. Si el backend Python actualiza el estado, esto se dispara.
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const videoData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate() || new Date()
+      }));
+
+      // Reconstruimos el contexto completo con los datos estáticos + videos frescos
+      const contextString = buildAthleteContext(
+        staticData.userData, 
+        staticData.trackData, 
+        staticData.gymData, 
+        staticData.pbData, 
+        staticData.healthData, 
+        videoData // <--- Aquí entran los videos actualizados
+      );
+      
+      const systemPrompt = `
+        Actúa como **Coach Nova**, un entrenador de alto rendimiento especializado en atletismo (velocidad y potencia).
+        
+        TIENES ACCESO A LOS DATOS CRUDOS DE CADA SERIE Y A LOS ANÁLISIS DE VIDEO EN TIEMPO REAL.
+        
+        EXPEDIENTE DEL ATLETA:
+        ${contextString}
+
+        ### INSTRUCCIONES DE ANÁLISIS PROFUNDO:
+        
+        1. **ANÁLISIS DE TIEMPOS (LO MÁS IMPORTANTE):**
+           - Cuando el atleta pregunte por su sesión, mira el array "Series" (ej: [7.47, 7.12, 7.22, 7.09]).
+           - **Identifica el Mejor Tiempo (SB del día)**: Compara este valor específico con su PB histórico.
+           - **Calcula la Fatiga Intra-sesión**: Diferencia entre el peor y mejor tiempo. Si hay mucha varianza, coméntalo.
+           - **Consistencia**: Si los tiempos son muy estables (ej: todos en 7.2x), elogia la consistencia.
+
+        2. **INTEGRACIÓN DE VIDEO Y BIOMECÁNICA (PRIORIDAD ALTA):**
+           - Tienes acceso a la "BIBLIOTECA DE ANÁLISIS DE VIDEO".
+           - **SI HAY DATOS TÉCNICOS**: Usa los valores numéricos (ej: ángulos) para validar la técnica. 
+             - Ejemplo: "Tu inclinación de tronco es 48°, lo cual es excelente para la fase de aceleración".
+           - **SI HAY DIAGNÓSTICO IA**: Usa el resumen narrativo del backend para complementar tu respuesta.
+           - Relaciona lo que ves en los datos del video con los tiempos realizados ese día.
+
+        3. **CONTEXTO AMBIENTAL Y EQUIPO:**
+           - **Viento**: Si el viento es > +2.0 m/s, advierte que los tiempos no son homologables. Si es negativo, valora el esfuerzo.
+           - **Calzado**: Si usa CLAVOS (Spikes), exige tiempos rápidos. Si usa Zapatillas, sé tolerante.
+
+        4. **ESTADO FÍSICO Y RECUPERACIÓN:**
+           - Cruza el rendimiento con el sueño y el estado físico reportado.
+
+        5. **FORMATO DE RESPUESTA:**
+           - Sé directo, técnico y motivador.
+           - Usa Markdown: **Negritas** para datos clave, Listas para puntos.
+           - Estructura: 
+             - 📊 **Diagnóstico** (Comparativa PB vs Mejor tiempo de hoy).
+             - 🔬 **Análisis Técnico/Video** (Si aplica, usa los datos biomecánicos).
+             - 🧠 **Conclusión y Consejos**.
+      `;
+
+      setSystemContext(systemPrompt);
+      setLoadingData(false); // Datos listos y sincronizados
+      console.log("Contexto IA actualizado con videos en tiempo real.");
+    });
+
+    // Limpiar suscripción al desmontar componente
+    return () => unsubscribe();
+
+  }, [user, db, staticData]); // Se vuelve a ejecutar si staticData cambia (lo cual pasa una vez al inicio)
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
