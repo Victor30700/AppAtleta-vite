@@ -8,6 +8,12 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import '../styles/HealthProfilePage.css';
 
+// Iconos para UI Premium
+import { 
+  FaArrowLeft, FaWeight, FaCrutch, FaFilePdf, FaPlus, 
+  FaEdit, FaTrash, FaHeartbeat, FaSearch, FaCalendarAlt
+} from 'react-icons/fa';
+
 export default function HealthProfilePage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -60,7 +66,7 @@ export default function HealthProfilePage() {
 
   // 4️⃣ Eliminar registro
   const handleDelete = async (type, idx) => {
-    if (!window.confirm('¿Seguro que deseas eliminar?')) return;
+    if (!window.confirm('¿Seguro que deseas eliminar este registro?')) return;
     setLoading(true);
     const key = type === 'peso' ? 'bodyEntries' : 'injuries';
     const updated = [...(type === 'peso' ? bodyEntries : allInjuries)];
@@ -74,8 +80,8 @@ export default function HealthProfilePage() {
   const downloadPDF = () => {
     const doc = new jsPDF('p', 'pt', 'letter');
     const title = view === 'peso'
-      ? 'RegistroPesoCorporal - SprinterApp'
-      : 'SprinterApp - Registro de lesiones';
+      ? 'Registro Corporal - SprinterApp'
+      : 'Historial de Lesiones - SprinterApp';
 
     doc.setFontSize(18);
     doc.text(title, 40, 40);
@@ -129,108 +135,164 @@ export default function HealthProfilePage() {
   };
 
   return (
-    <div className="health-profile-container">
-      <button className="back-button" onClick={() => navigate('/home')}>
-        ← Volver
-      </button>
-
-      <div className="header-controls">
-        <div className="view-switch">
-          <button
-            className={view === 'peso' ? 'active' : ''}
-            onClick={() => navigate('/health-profile?view=peso')}
-            disabled={loading}
-          >
-            Peso & Altura
+    <div className="health-profile-wrapper">
+      <div className="health-profile-container">
+        
+        {/* HEADER */}
+        <div className="health-header">
+          <button className="btn-icon-back" onClick={() => navigate('/home')}>
+            <FaArrowLeft />
           </button>
-          <button
-            className={view === 'lesiones' ? 'active' : ''}
-            onClick={() => navigate('/health-profile?view=lesiones')}
-            disabled={loading}
-          >
-            Lesiones
-          </button>
+          <h2 className="health-title">PERFIL DE SALUD</h2>
         </div>
-        <div className="search-download">
-          <input
-            type="month"
-            value={busqueda}
-            onChange={e => setBusqueda(e.target.value)}
-            disabled={loading}
-          />
-          {/** ↓ Solo aparece si hay filtro y resultados ↓ */}
-          {busqueda && entradasFiltradas.length > 0 && (
-            <button onClick={downloadPDF} disabled={loading}>
-              Descargar PDF
-            </button>
-          )}
-        </div>
-      </div>
 
-      <div className="main-content">
-        <button
-          onClick={() =>
-            navigate(
-              view === 'peso'
-                ? '/health-profile/peso-altura'
-                : '/health-profile/lesiones'
-            )
-          }
-          disabled={loading}
-        >
-          + Nuevo registro
-        </button>
-
-        {loading && <p>Cargando datos...</p>}
-
-        <div className="entries-grid">
-          {entradasFiltradas.map((e, i) => (
-            <div
-              key={i}
-              className={`entry-card ${
-                view === 'lesiones' && e.active === false ? 'recovered' : ''
-              }`}
-            >
-              {view === 'peso' ? (
-                <>
-                  <h4>{e.date}</h4>
-                  <p><strong>Peso:</strong> {e.weightKg} kg ({e.weightLbs} lbs)</p>
-                  <p><strong>Altura:</strong> {e.heightM} m ({e.heightFt})</p>
-                  <p><strong>% Grasa:</strong> {e.bodyFat || '—'}</p>
-                  <p><strong>Actividad:</strong> {e.activityLevel || '—'}</p>
-                  <p><strong>Notas:</strong> {e.notes || '—'}</p>
-                  <hr/>
-                  <p><strong>IMC:</strong> {e.bmi} ({e.category})</p>
-                  <p><strong>Peso ideal:</strong> {e.idealMinKg}–{e.idealMaxKg} kg</p>
-                </>
-              ) : (
-                <>
-                  <h4>{e.date}</h4>
-                  <p><strong>Lesión:</strong> {e.name}</p>
-                  <p><strong>Estado:</strong> {e.active ? 'Activa' : 'Recuperada'}</p>
-                  <p><strong>Notas:</strong> {e.notes || '—'}</p>
-                </>
-              )}
-              <div className="entry-actions">
+        {/* CONTROLES SUPERIORES (SWITCH Y FILTROS) */}
+        <div className="controls-card">
+            <div className="view-switch-neon">
                 <button
-                  onClick={() =>
-                    navigate(
-                      `/health-profile/${
-                        view === 'peso' ? 'peso-altura' : 'lesiones'
-                      }?edit=${i}`
-                    )
-                  }
-                  disabled={loading}
+                    className={`switch-btn ${view === 'peso' ? 'active' : ''}`}
+                    onClick={() => navigate('/health-profile?view=peso')}
+                    disabled={loading}
                 >
-                  Editar
+                    <FaWeight /> Corporal
                 </button>
-                <button onClick={() => handleDelete(view, i)} disabled={loading}>
-                  Eliminar
+                <button
+                    className={`switch-btn ${view === 'lesiones' ? 'active' : ''}`}
+                    onClick={() => navigate('/health-profile?view=lesiones')}
+                    disabled={loading}
+                >
+                    <FaCrutch /> Lesiones
                 </button>
-              </div>
             </div>
-          ))}
-          {!entradasFiltradas.length && !loading && <p>No hay registros aún.</p>}
+
+            <div className="search-bar-neon">
+                <div className="input-wrapper">
+                    <FaCalendarAlt className="search-icon"/>
+                    <input
+                        type="month"
+                        className="search-input"
+                        value={busqueda}
+                        onChange={e => setBusqueda(e.target.value)}
+                        disabled={loading}
+                    />
+                </div>
+                
+                {busqueda && entradasFiltradas.length > 0 && (
+                    <button className="btn-pdf-icon" onClick={downloadPDF} disabled={loading} title="Descargar PDF">
+                        <FaFilePdf />
+                    </button>
+                )}
+            </div>
+        </div>
+
+        {/* CONTENIDO PRINCIPAL */}
+        <div className="main-content">
+            
+            <button
+                className="btn-add-neon"
+                onClick={() =>
+                    navigate(
+                        view === 'peso'
+                        ? '/health-profile/peso-altura'
+                        : '/health-profile/lesiones'
+                    )
+                }
+                disabled={loading}
+            >
+                <FaPlus /> {view === 'peso' ? 'Registrar Medición' : 'Reportar Lesión'}
+            </button>
+
+            {loading && <div className="loading-spinner">Cargando...</div>}
+
+            <div className="entries-grid">
+                {entradasFiltradas.length === 0 && !loading ? (
+                    <div className="empty-state">
+                        <FaHeartbeat size={40} />
+                        <p>No hay registros disponibles.</p>
+                    </div>
+                ) : (
+                    entradasFiltradas.map((e, i) => (
+                        <div
+                            key={i}
+                            className={`entry-card ${
+                                view === 'lesiones' && e.active === false ? 'recovered-card' : ''
+                            }`}
+                        >
+                            {view === 'peso' ? (
+                                /* TARJETA DE PESO */
+                                <>
+                                    <div className="card-header">
+                                        <div className="date-badge">{e.date}</div>
+                                        <div className="bmi-badge">IMC: {e.bmi}</div>
+                                    </div>
+                                    
+                                    <div className="card-body-grid">
+                                        <div className="stat-box">
+                                            <span className="label">Peso</span>
+                                            <span className="value">{e.weightKg} <small>kg</small></span>
+                                        </div>
+                                        <div className="stat-box">
+                                            <span className="label">Grasa</span>
+                                            <span className="value">{e.bodyFat || '--'}</span>
+                                        </div>
+                                        <div className="stat-box">
+                                            <span className="label">Altura</span>
+                                            <span className="value">{e.heightM} <small>m</small></span>
+                                        </div>
+                                    </div>
+
+                                    {e.notes && (
+                                        <div className="notes-box">
+                                            <span>📝 Notas:</span> {e.notes}
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                /* TARJETA DE LESIÓN */
+                                <>
+                                    <div className="card-header">
+                                        <div className="date-badge">{e.date}</div>
+                                        <span className={`status-badge ${e.active ? 'active' : 'recovered'}`}>
+                                            {e.active ? '⚠️ Activa' : '✅ Recuperada'}
+                                        </span>
+                                    </div>
+                                    
+                                    <h3 className="injury-title">{e.name}</h3>
+                                    
+                                    {e.notes && (
+                                        <div className="notes-box injury-notes">
+                                            {e.notes}
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
+                            <div className="card-actions">
+                                <button
+                                    className="action-btn edit"
+                                    onClick={() =>
+                                        navigate(
+                                            `/health-profile/${
+                                                view === 'peso' ? 'peso-altura' : 'lesiones'
+                                            }?edit=${i}`
+                                        )
+                                    }
+                                    disabled={loading}
+                                >
+                                    <FaEdit /> Editar
+                                </button>
+                                <button 
+                                    className="action-btn delete" 
+                                    onClick={() => handleDelete(view, i)} 
+                                    disabled={loading}
+                                >
+                                    <FaTrash />
+                                </button>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
         </div>
       </div>
     </div>

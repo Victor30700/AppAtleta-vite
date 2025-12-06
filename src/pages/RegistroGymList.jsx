@@ -7,6 +7,12 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import styles from '../styles/RegistroGymList.module.css';
 
+// Iconos para mejorar la UI
+import { 
+  FaArrowLeft, FaPlus, FaFilePdf, FaDumbbell, FaCalendarAlt, 
+  FaEdit, FaTrash, FaWeightHanging, FaClipboardList, FaCheckCircle 
+} from 'react-icons/fa';
+
 export default function RegistroGymList() {
   const navigate = useNavigate();
   const auth = getAuth();
@@ -142,82 +148,147 @@ export default function RegistroGymList() {
   return (
     <div className={styles.listaWrapper}>
       <div className={styles.listaContainer}>
-        {/* Header y switch */}
-        <div className={styles.listaHeader}>
-          <button className={styles.btn} onClick={() => navigate('/home')}>← Volver</button>
-          <div className={styles.modeSwitch}>
-            <button
-              className={`${styles.btn} ${mode==='mensual'?styles.active:''}`}
-              onClick={() => setMode('mensual')}
-            >Mensual</button>
-            <button
-              className={`${styles.btn} ${mode==='diario'?styles.active:''}`}
-              onClick={() => setMode('diario')}
-            >Diario</button>
-          </div>
-          {mode==='mensual'
-            ? <button className={styles.btn} onClick={() => navigate('/registro-gym/nuevo')}>+ Nuevo Registro Mensual</button>
-            : <button className={styles.btn} onClick={() => navigate('/registro-gym/diario')}>+ Nuevo Registro Diario</button>
-          }
+        
+        {/* === HEADER SUPERIOR === */}
+        <div className={styles.topBar}>
+            <button className={styles.btnIcon} onClick={() => navigate('/home')}>
+                <FaArrowLeft /> Volver
+            </button>
+            <h2 className={styles.pageTitle}>Registro GYM</h2>
         </div>
 
-        {/* Buscador y descarga PDF */}
-        <div className={styles.formGroup}>
-          <label htmlFor="busqueda">Buscar por mes y año</label>
-          <input
-            id="busqueda"
-            type="month"
-            value={busqueda}
-            onChange={e => setBusqueda(e.target.value)}
-          />
-        </div>
-        {busqueda && (mensualFiltrada.length || diarioFiltrado.length) > 0 && (
-          <button className={styles.btn} onClick={downloadPDF}>
-            Descargar PDF
-          </button>
-        )}
+        {/* === CONTROLES DE MODO (Switch) === */}
+        <div className={styles.controlsSection}>
+            <div className={styles.modeSwitch}>
+                <button
+                className={`${styles.switchBtn} ${mode==='mensual' ? styles.active : ''}`}
+                onClick={() => setMode('mensual')}
+                >
+                📅 Mensual
+                </button>
+                <button
+                className={`${styles.switchBtn} ${mode==='diario' ? styles.active : ''}`}
+                onClick={() => setMode('diario')}
+                >
+                🏋️ Diario
+                </button>
+            </div>
 
-        {/* Listado */}
-        <div className={styles.listaItems}>
-          {mode==='mensual'
-            ? mensualFiltrada.map(r => (
-                <div key={r.id} className={styles.listaItem}>
-                  <div><strong>Plan:</strong> {r.plan?.descripcion || '–'}</div>
-                  <div><strong>Fechas:</strong> {r.plan?.fechaInicio || '–'} → {r.plan?.fechaFin || '–'}</div>
-                  <div><strong>Peso Corporal:</strong> {r.pesocorporal ?? r.peso ?? '–'} kg</div>
-                  <div><strong>% Carga Calculados:</strong></div>
-                  <ul>
-                    {(r.calculos || []).map((c, i) => (
-                      <li key={i}>{c.porcentaje}% → {c.pesoCalculado} kg</li>
-                    ))}
-                  </ul>
-                  <div><strong>Veces cumpliste el plan:</strong> {r.vecesQueCumplisteElPlan ?? r.repeticiones ?? 0}</div>
-                  <div className={styles.actions}>
-                    <button className={styles.btn} onClick={() => navigate(`/registro-gym/nuevo?id=${r.id}`)}>Editar</button>
-                    <button className={styles.btn} onClick={() => handleEliminarMensual(r.id)}>Eliminar</button>
+            {/* Buscador & PDF */}
+            <div className={styles.filterRow}>
+                <div className={styles.dateInputWrapper}>
+                    <FaCalendarAlt className={styles.inputIcon}/>
+                    <input
+                        id="busqueda"
+                        type="month"
+                        value={busqueda}
+                        onChange={e => setBusqueda(e.target.value)}
+                        className={styles.dateInput}
+                    />
+                </div>
+                
+                {busqueda && (mensualFiltrada.length || diarioFiltrado.length) > 0 && (
+                <button className={styles.btnPdf} onClick={downloadPDF} title="Descargar PDF">
+                    <FaFilePdf />
+                </button>
+                )}
+            </div>
+        </div>
+
+        {/* === BOTÓN PRINCIPAL DE ACCIÓN === */}
+        <button 
+            className={styles.btnNewFull} 
+            onClick={() => navigate(mode === 'mensual' ? '/registro-gym/nuevo' : '/registro-gym/diario')}
+        >
+            <FaPlus /> {mode === 'mensual' ? 'Crear Plan Mensual' : 'Registrar Sesión Diaria'}
+        </button>
+
+        {/* === LISTADO DE TARJETAS === */}
+        <div className={styles.cardsGrid}>
+          {mode === 'mensual' ? (
+            /* MODO MENSUAL */
+            mensualFiltrada.length === 0 ? <p className={styles.emptyState}>No hay planes mensuales.</p> :
+            mensualFiltrada.map(r => (
+                <div key={r.id} className={styles.card}>
+                  <div className={styles.cardHeader}>
+                    <span className={styles.cardTitle}>{r.plan?.descripcion || 'Sin título'}</span>
+                    <span className={styles.badgePrimary}>{r.pesocorporal ?? r.peso ?? '?'} kg</span>
+                  </div>
+                  
+                  <div className={styles.cardBody}>
+                    <div className={styles.infoRow}>
+                        <FaCalendarAlt className={styles.infoIcon}/> 
+                        <span>{r.plan?.fechaInicio} ➔ {r.plan?.fechaFin}</span>
+                    </div>
+                    
+                    <div className={styles.infoRow}>
+                        <FaCheckCircle className={styles.infoIcon}/> 
+                        <span>Cumplido: <strong>{r.vecesQueCumplisteElPlan ?? r.repeticiones ?? 0}</strong> veces</span>
+                    </div>
+
+                    <div className={styles.calculosGrid}>
+                        {(r.calculos || []).slice(0, 4).map((c, i) => (
+                            <span key={i} className={styles.tagCalc}>
+                                {c.porcentaje}%: {c.pesoCalculado}
+                            </span>
+                        ))}
+                        {(r.calculos || []).length > 4 && <span>...</span>}
+                    </div>
+                  </div>
+
+                  <div className={styles.cardFooter}>
+                    <button className={styles.btnAction} onClick={() => navigate(`/registro-gym/nuevo?id=${r.id}`)}>
+                        <FaEdit /> Editar
+                    </button>
+                    <button className={`${styles.btnAction} ${styles.btnDelete}`} onClick={() => handleEliminarMensual(r.id)}>
+                        <FaTrash />
+                    </button>
                   </div>
                 </div>
               ))
-            : diarioFiltrado.map(r => (
-                <div key={r.id} className={styles.listaItem}>
-                  <div><strong>Fecha:</strong> {r.fecha}</div>
-                  <div><strong>Zona:</strong> {r.zona}</div>
-                  <div><strong>Plan:</strong> {r.plan}</div>
-                  <div><strong>Unidad:</strong> {r.unidadPeso}</div>
-                  <div><strong>Ejercicios:</strong>
-                    <ul>
-                      {r.ejercicios.map((e, i) => (
-                        <li key={i}>{e.nombre} - Reps: {e.repeticiones}, Desc: {e.descanso}min, Next: {e.descansoSiguiente}min, Pesos: [{e.pesos.join(', ')}]</li>
-                      ))}
-                    </ul>
+          ) : (
+            /* MODO DIARIO */
+            diarioFiltrado.length === 0 ? <p className={styles.emptyState}>No hay registros diarios.</p> :
+            diarioFiltrado.map(r => (
+                <div key={r.id} className={styles.card}>
+                  <div className={styles.cardHeader}>
+                    <div className={styles.headerLeft}>
+                        <span className={styles.cardDate}>{r.fecha}</span>
+                        <span className={styles.cardZone}>{r.zona}</span>
+                    </div>
+                    <span className={styles.badgeSecondary}>{r.unidadPeso}</span>
                   </div>
-                  <div className={styles.actions}>
-                    <button className={styles.btn} onClick={() => navigate(`/registro-gym/diario?id=${r.id}`)}>Editar</button>
-                    <button className={styles.btn} onClick={() => handleEliminarDiario(r.id)}>Eliminar</button>
+
+                  <div className={styles.cardBody}>
+                    <div className={styles.planDescription}>
+                        <FaClipboardList className={styles.infoIcon}/>
+                        <p>{r.plan}</p>
+                    </div>
+                    
+                    <div className={styles.ejerciciosList}>
+                        <strong><FaDumbbell className={styles.infoIcon}/> Ejercicios:</strong>
+                        <ul>
+                        {r.ejercicios.slice(0, 3).map((e, i) => (
+                            <li key={i}>
+                                {e.nombre} <span className={styles.repsBadge}>x{e.repeticiones}</span>
+                            </li>
+                        ))}
+                        {r.ejercicios.length > 3 && <li>... y {r.ejercicios.length - 3} más</li>}
+                        </ul>
+                    </div>
+                  </div>
+
+                  <div className={styles.cardFooter}>
+                    <button className={styles.btnAction} onClick={() => navigate(`/registro-gym/diario?id=${r.id}`)}>
+                        <FaEdit /> Editar
+                    </button>
+                    <button className={`${styles.btnAction} ${styles.btnDelete}`} onClick={() => handleEliminarDiario(r.id)}>
+                        <FaTrash />
+                    </button>
                   </div>
                 </div>
               ))
-          }
+          )}
         </div>
       </div>
     </div>
