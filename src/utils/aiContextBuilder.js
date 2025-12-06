@@ -1,7 +1,7 @@
 import { format, parseISO, subDays, isAfter, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-export const buildAthleteContext = (profile, trainings, gym, pbs, health) => {
+export const buildAthleteContext = (profile, trainings, gym, pbs, health, videos = []) => {
   const today = new Date();
   const todayStr = format(today, "yyyy-MM-dd");
   
@@ -140,6 +140,31 @@ export const buildAthleteContext = (profile, trainings, gym, pbs, health) => {
             context += `      Cargas: ${ejercicios}\n`;
         }
     });
+  }
+
+  // --- NUEVA SECCIÓN: ANÁLISIS DE VIDEO (BIOMECÁNICA) ---
+  if (videos && videos.length > 0) {
+    context += `\n🎥 BIBLIOTECA DE ANÁLISIS DE VIDEO (Últimos registros):\n`;
+    
+    videos.forEach(v => {
+      const fechaVideo = v.createdAt ? format(v.createdAt, 'yyyy-MM-dd HH:mm') : 'Fecha desconocida';
+      const estado = v.status === 'completed' ? '✅ Procesado' : '⏳ En proceso';
+      
+      context += `   📅 ${fechaVideo} | Título: "${v.title}"\n`;
+      context += `      📝 Descripción del atleta: "${v.description}"\n`;
+      context += `      ℹ️ Estado: ${estado} | ID: ${v.id}\n`;
+      
+      // Si el backend genera métricas clave en el futuro, se añadirán aquí
+      if (v.metricsSummary || v.aiSummary) { 
+         const summary = v.metricsSummary ? JSON.stringify(v.metricsSummary) : v.aiSummary;
+         context += `      🤖 Datos Biomecánicos: ${summary}\n`;
+      }
+      context += `      -----------------------------------\n`;
+    });
+    
+    context += `\n   INSTRUCCIÓN DE VIDEO: Si el atleta pregunta por su técnica, cruza la información de sus "Sensaciones" en el entrenamiento de pista con la "Descripción" de sus videos recientes. Si el video está procesado, sugiere revisar la herramienta de análisis.\n`;
+  } else {
+    context += `\n🎥 VIDEOS: No hay videos subidos recientemente para análisis.\n`;
   }
 
   return context;

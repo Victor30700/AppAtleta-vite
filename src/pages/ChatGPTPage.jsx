@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Copy, Send, Trash2, Download, Bot, User, ArrowLeft, Loader2 } from 'lucide-react';
 import { sendMessageToGPT } from '../config/openai';
 import { useAuth } from '../context/AuthContext';
-import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { app } from '../config/firebase';
 import { useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
@@ -22,11 +22,11 @@ export default function ChatGPTPage() {
     {
       role: 'assistant',
       content: `### 🚀 Sistema Coach Nova Iniciado
-Hola atleta. He cargado tu expediente completo con **tiempos detallados**, **clima** y **cargas de gimnasio**.
+Hola atleta. He cargado tu expediente completo con **tiempos detallados**, **clima**, **cargas de gimnasio** y **análisis de video**.
 
 ¿En qué nos enfocamos hoy?
 * 📊 Analizar el rendimiento técnico de tu última sesión (fatiga, consistencia).
-* 🥗 Planificar nutrición pre/post entreno.
+* 📹 Revisión biomecánica de tus videos recientes.
 * 🧠 Estrategia competitiva basada en tus marcas.`
     }
   ]);
@@ -76,13 +76,25 @@ Hola atleta. He cargado tu expediente completo con **tiempos detallados**, **cli
         };
         healthData.entries.sort((a,b) => new Date(b.date) - new Date(a.date));
 
-        // Construir contexto inteligente
-        const contextString = buildAthleteContext(userData, trackData, gymData, pbData, healthData);
+        // 6. Videos (NUEVO: Cargar los últimos 5 videos)
+        const videosRef = collection(db, 'userVideos', user.uid, 'videos');
+        const videoQuery = query(videosRef, orderBy('createdAt', 'desc'), limit(5));
+        const videoSnap = await getDocs(videoQuery);
+        
+        const videoData = videoSnap.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          // Convertimos el timestamp de Firestore a Date JS para el builder
+          createdAt: doc.data().createdAt?.toDate() || new Date()
+        }));
+
+        // Construir contexto inteligente pasando videoData
+        const contextString = buildAthleteContext(userData, trackData, gymData, pbData, healthData, videoData);
         
         const systemPrompt = `
           Actúa como **Coach Nova**, un entrenador de alto rendimiento especializado en atletismo (velocidad y potencia).
           
-          TIENES ACCESO A LOS DATOS CRUDOS DE CADA SERIE. NO SOLO PROMEDIOS.
+          TIENES ACCESO A LOS DATOS CRUDOS DE CADA SERIE Y A LOS ANÁLISIS DE VIDEO.
           
           EXPEDIENTE DEL ATLETA:
           ${contextString}
@@ -95,20 +107,26 @@ Hola atleta. He cargado tu expediente completo con **tiempos detallados**, **cli
              - **Calcula la Fatiga Intra-sesión**: Diferencia entre el peor y mejor tiempo. Si hay mucha varianza, coméntalo.
              - **Consistencia**: Si los tiempos son muy estables (ej: todos en 7.2x), elogia la consistencia.
 
-          2. **CONTEXTO AMBIENTAL Y EQUIPO:**
-             - **Viento**: Si el viento es > +2.0 m/s, advierte que los tiempos no son homologables. Si es negativo (en contra), valora el esfuerzo extra.
-             - **Calzado**: Si usa CLAVOS (Spikes), los tiempos deben ser rápidos. Si usa Zapatillas, sé tolerante (0.5s - 1s más lento es normal).
+          2. **INTEGRACIÓN DE VIDEO Y BIOMECÁNICA:**
+             - Tienes acceso a los metadatos de los videos recientes en la sección "BIBLIOTECA DE ANÁLISIS DE VIDEO".
+             - Si el atleta menciona "mira mi video" o pregunta por técnica, revisa la descripción y título de los videos recientes.
+             - Si el estado es "✅ Procesado" (completed), sugiere revisar la pestaña "Análisis de Video" para ver ángulos y trayectorias.
+             - Relaciona la "Descripción" del video (ej: "partida estática") con los tiempos de pista de fechas cercanas.
 
-          3. **ESTADO FÍSICO Y RECUPERACIÓN:**
-             - Cruza el rendimiento con el sueño y el estado físico reportado. (Ej: "Rendiste bien a pesar de dormir solo 5h, cuidado con el sistema nervioso").
+          3. **CONTEXTO AMBIENTAL Y EQUIPO:**
+             - **Viento**: Si el viento es > +2.0 m/s, advierte que los tiempos no son homologables. Si es negativo, valora el esfuerzo.
+             - **Calzado**: Si usa CLAVOS (Spikes), exige tiempos rápidos. Si usa Zapatillas, sé tolerante.
 
-          4. **FORMATO DE RESPUESTA:**
+          4. **ESTADO FÍSICO Y RECUPERACIÓN:**
+             - Cruza el rendimiento con el sueño y el estado físico reportado.
+
+          5. **FORMATO DE RESPUESTA:**
              - Sé directo, técnico y motivador.
              - Usa Markdown: **Negritas** para datos clave, Listas para puntos.
              - Estructura: 
                - 📊 **Diagnóstico** (Comparativa PB vs Mejor tiempo de hoy).
-               - 🔬 **Análisis Técnico** (Desglose de la serie, influencia del viento/calzado).
-               - 🧠 **Conclusión y Consejos** (Basado en la fatiga y estado físico).
+               - 🔬 **Análisis Técnico/Video** (Si aplica).
+               - 🧠 **Conclusión y Consejos**.
         `;
 
         setSystemContext(systemPrompt);
@@ -275,7 +293,7 @@ Hola atleta. He cargado tu expediente completo con **tiempos detallados**, **cli
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSend()}
-            placeholder={loadingData ? "Cargando registros..." : "Consulta sobre tu entrenamiento, dieta o estrategia..."}
+            placeholder={loadingData ? "Cargando registros..." : "Consulta sobre tu entrenamiento, dieta o videos..."}
             disabled={loadingData || loading}
           />
           <button 
@@ -287,7 +305,7 @@ Hola atleta. He cargado tu expediente completo con **tiempos detallados**, **cli
           </button>
         </div>
         <div className="input-footer">
-          IA v2.5 | Optimización de rendimiento deportivo
+          IA v2.6 | Optimización con Análisis de Video
         </div>
       </div>
     </div>
